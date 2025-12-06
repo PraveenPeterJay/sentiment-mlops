@@ -1,0 +1,17 @@
+# 1. Start with Python
+FROM python:3.9-slim
+
+WORKDIR /app
+
+# 2. Install libraries
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# 3. Copy code
+COPY . .
+
+# 4. Open the door (Port 8501 is standard for Streamlit)
+EXPOSE 8501
+
+# 5. Run Streamlit
+CMD ["streamlit", "run", "frontend.py", "--server.port=8501", "--server.address=0.0.0.0"]

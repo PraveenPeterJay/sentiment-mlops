@@ -1,0 +1,502 @@
+Phase 1:
+***************************************************************
+Step 1: Project Initialization
+- Create a Directory called 'data':
+    mkdir data
+- Install the necessary tools:
+    pip install pandas scikit-learn mlflow dvc dvc-s3
+- Initialize git
+    git init
+- Create a .gitignore file:
+    __pycache__/
+    data/*.csv
+    dvc_storage/
+    mlruns/
+    .DS_Store
+*************************************************************
+Step 2: Download the dataset and split it.
+- Link: https://www.kaggle.com/datasets/lakshmi25npathi/imdb-dataset-of-50k-movie-reviews
+    And extract the zip and store the csv file as full_dataset.csv inside the data folder.
+- Create the "Data Manager" Script:
+    We need a script that decides how much data we use.
+    Create a file manage_data.py.
+    In this script, we extract only 10000 rows out of the 50k rows available.
+- Generate the version 1 data:
+    Run the command: python manage_data.py 1
+    Result: You now have a file data/train.csv inside your folder.
+************************************************************
+Step 3: Setup DVC(Data Version Control)
+Now we lock this train.csv file so we can prove to the professor we are tracking versions.
+1)Initialize DVC:
+    dvc init
+2) Set up Local Storage (The "Cloud"):
+    mkdir /tmp/dvc_store
+    dvc remote add -d mylocal /tmp/dvc_store
+3) Track the Data:
+    dvc add data/train.csv
+    What happened? DVC created data/train.csv.dvc. This is the "fingerprint" file.
+4) Save to History:
+    git add .
+    git commit -m "Initialize DVC with Data Version 1 (10000 rows)"
+    dvc push
+*****************************************************************
+Step 4:
+Create the Training Script (with MLflow)
+
+Now we train the model on this real IMDB data.
+
+    Create train.py.
+******************************************************************
+Step 5:
+1) Verify Everything
+Run the training: python train.py
+2) Launch the MLflow UI to check your work:
+    pip install protobuf==4.25.3
+    mlflow ui 
+Go to localhost:5000
+*************************************************************
+Summary of Phase 1
+
+    Dataset: Real IMDB data downloaded.
+
+    Incremental Logic: We created manage_data.py which currently outputs Version 1 (small data). Later, we will run it with "2" to output big data.
+
+    DVC: Tracking train.csv.
+
+    MLflow: Logging the experiments.
+
+1. The "Why": Explaining the Tools
+Why git init? (We haven't touched GitHub yet!)
+
+You asked: "Why are we doing git init when I am not even connecting to my github account?"
+
+    The Answer: Git is not GitHub.
+
+        Git is a time machine that lives on your laptop. It records changes.
+
+        GitHub is just a website where you upload those records later.
+
+    Why we need it now: DVC requires Git to work. DVC is "Git for big files." It can't function unless there is a Git repository to "piggyback" on. When you run dvc init, DVC checks: "Is this folder a Git repo?" If not, it crashes.
+
+    What happened: When you typed git init, you created a hidden folder .git/ that starts tracking every file change locally.
+
+What is DVC (Data Version Control)?
+
+    The Problem: Git is designed for text code (kilobytes). If you put a 2GB CSV file in Git, it will slow down and eventually crash.
+
+    The DVC Solution: DVC acts like a librarian.
+
+        It takes your heavy train.csv.
+
+        It calculates a unique "fingerprint" (hash) for that file.
+
+        It moves the heavy file into a hidden storage area (your cache).
+
+        It creates a tiny text file named train.csv.dvc that contains just the fingerprint.
+
+    The Trick: You commit the tiny .dvc file to Git. You never commit the heavy CSV. This way, Git tracks which version of the data you used, without holding the data itself.
+
+What is MLflow?
+
+    The Problem: In AI, you run code 50 times with different settings. "Did I use 1000 rows or 5000 rows? Was the accuracy 80% or 82%?" You forget.
+
+    The MLflow Solution: It is an automated lab notebook.
+
+        Tracking: It writes down every parameter (e.g., "Vectorizer=Tfidf") and result (e.g., "Accuracy=0.85").
+
+        Artifacts: It saves the actual "brain" (the .pkl model file) so you can load it later.
+
+2. The Connections: How do they talk to each other?
+
+You asked: "How is dvc connected to my github and mlflow connected to my github?"
+
+Short Answer: They are NOT connected to GitHub directly. They are connected to your folder.
+The DVC ↔ GitHub Connection
+
+    It's manual, not magic.
+
+        DVC does not talk to GitHub.
+
+        Git talks to GitHub.
+
+        The Flow:
+
+            DVC creates the tiny train.csv.dvc file.
+
+            Git uploads train.csv.dvc to GitHub.
+
+        The Result: When the professor looks at your GitHub, they see train.csv.dvc. They know exactly what data you used, but the heavy data isn't there.
+
+The MLflow ↔ GitHub Connection
+
+    There is no connection.
+
+        MLflow runs entirely on your laptop (inside the mlruns folder).
+
+        We added mlruns/ to .gitignore. Why? Because we don't want 500 experiment logs cluttering up our GitHub code.
+
+        In Production (Later): In a real company, MLflow would run on a central server. For this project, it lives locally on your machine.
+3. Step-by-Step "Under the Hood"
+
+Here is exactly what happened when you ran those commands:
+Command -> What actually happened on your hard drive
+a) python manage_data.py 1	-> Created Data: A file data/train.csv (10000 rows) was written to your disk.
+b) dvc init	-> Setup: DVC created a hidden folder .dvc/ to store its config. It checked "Is Git present?" (Yes).
+c) dvc remote add -d mylocal /tmp/dvc_store	-> Storage: You told DVC: "When I say 'push', don't go to AWS S3. Just copy files to my /tmp/dvc_store folder."
+d) dvc add data/train.csv	-> 
+The Magic:
+
+1. DVC calculated the SHA (fingerprint) of train.csv.
+
+2. It moved the real train.csv into a hidden cache (.dvc/cache).
+
+3. It created a "link" back to data/train.csv so you can still see it.
+
+4. It created data/train.csv.dvc (the claim ticket).
+
+e) git add . ->
+
+Staging: You told Git: "I want to save train.py, .gitignore, and train.csv.dvc."
+
+(Git ignores the heavy train.csv because of .gitignore).
+f) python train.py	->
+
+The Experiment:
+
+1. Python read data/train.csv.
+
+2. It trained the model.
+
+3. MLflow created a new folder inside mlruns/ and saved two things: The metrics (Accuracy score) and the Model File (model.pkl).
+
+----------------------------------------------------------------
+Phase 2: Building the backend 
+1) Step 1: Building the Backend API.
+The Goal: We need a "waiter" (the API) that takes an order (a movie review) from the customer, brings it to the chef (the Model), and returns the dish (Positive/Negative sentiment).
+We will use FastAPI. It is the modern standard for MLOps because it is fast and automatically creates documentation.
+
+Step 1: Understand the "Link" (The URI)
+Before we write code, we need to know where your model lives.
+    Go to your terminal where train.py ran.
+
+    Look at the output. You should see a line saying something like: Model saved to MLflow
+
+    Go to your browser (http://localhost:5000).
+
+    Click on your Experiment (IMDB_Sentiment_Analysis).
+
+    Click on the latest Run (the top one).
+
+    Scroll down to the Artifacts section on the right.
+
+    Click on the folder named MLmodel.
+
+    Look for the Full Path or URI. It looks like: runs:/<some-long-id>/model or an absolute path like /home/user/mlruns/....
+
+        Note: For this code, we will use the dynamic "runs" method so you don't have to copy-paste messy paths.
+
+Step 2: Create the Backend Code (app.py)
+Create a new file named app.py in your main folder. 
+
+Step 3: Install FastAPI
+You need to install the server library (uvicorn) and the API framework (fastapi).
+pip install fastapi uvicorn
+
+Step 4: Run the Server
+Now, let's turn on the engine.
+Run this command:
+    uvicorn app:app --reload
+
+    app:app: The first app is the filename (app.py), the second app is the variable name inside the code.
+
+    --reload: This means if you change the code, the server restarts automatically (great for development).
+
+What you should see: You should see green logs saying Uvicorn running on http://127.0.0.1:8000.
+
+Step 5: Test It (The Moment of Truth)
+
+We don't need to build a website to test the backend. FastAPI gives us a free testing website.
+
+    Open your browser and go to: http://127.0.0.1:8000/docs
+
+    You will see a blue page titled "Sentiment Analysis API". This is automatic documentation (Swagger UI).
+
+    Click on the green bar POST /predict.
+
+    Click the Try it out button (top right of the bar).
+
+    In the Request body box, type a test review.
+
+    Click Execute.
+
+Detailed Explanation of What Just Happened
+
+User: "Why did we do all this?"
+
+    Dynamic Loading: The code mlflow.search_runs is smart. It doesn't look for a hardcoded file. It asks MLflow: "What is the newest brain you have?"
+
+        Why this gets marks: This is Automation. If you retrain the model tomorrow, this API will automatically pick up the new one without you changing a single line of code in app.py.
+
+    Pydantic (class Review):
+
+        This protects your API. If someone sends a number 123 instead of text, the API rejects it immediately. This is Reliability.
+
+    The URI (runs:/...):
+
+        This is the link between Model Registry (Phase 1) and Deployment (Phase 2). We are not copying files manually; we are referencing the registry.
+
+That is an excellent observation. You are right—you never wrote a function for /docs, yet it exists.
+
+This is one of the main reasons FastAPI is preferred over older tools like Flask for MLOps.
+The "Magic" of /docs
+
+The /docs page is automatically generated by FastAPI. It is not a file you write; it is a dynamic page built in real-time by inspecting your code.
+
+Here is the breakdown of how it works "Under the Hood":
+1. It Reads Your Python Types (The Blueprint)
+
+FastAPI looks at this part of your code:
+Python
+
+class Review(BaseModel):
+    text: str
+
+It sees that text must be a string. It uses this information to build the "Request Body" section in the documentation, telling users exactly what JSON format to send. If you changed str to int, the documentation would instantly update to say "Integer required."
+2. It Follows the "OpenAPI" Standard
+
+When you run app = FastAPI(), the library silently creates a hidden file called openapi.json. This file describes every single "door" (endpoint) into your application.
+
+    It sees @app.post("/predict").
+
+    It sees the function description """Receives a review text...""".
+
+    It compiles all of this into a standard format.
+
+3. Swagger UI (The Visuals)
+
+The page you see at /docs is a famous tool called Swagger UI. FastAPI includes it by default. It reads that hidden openapi.json file and turns it into the interactive blue website you are using.
+Why this earns you marks
+
+In a professional DevOps/MLOps environment, documentation is mandatory.
+
+    Without FastAPI: You would have to write a separate PDF or Wiki page explaining: "To use my API, send a POST request to /predict..."
+
+    With FastAPI: The code is the documentation. This is called "Self-Documenting Code."
+
+---------------------------------------------------
+
+Phase 3: Building the frontend:
+We will use Streamlit. It is incredibly simple—it turns Python scripts into websites without needing HTML or CSS.
+
+Goal: A clean web page where the professor can type a movie review and see the sentiment.
+
+Step 1: Create the Frontend Code (frontend.py)
+
+Create a new file named frontend.py in your main folder.
+
+Step 2: Install Streamlit
+    pip install streamlit
+
+Step 3: Run the Frontend
+
+Crucial Note: You need two terminals open now.
+
+    Terminal 1: Must keep running the Backend (uvicorn app:app --reload). Do not close this!
+
+    Terminal 2: Open a new terminal window/tab, navigate to your folder, and run:
+    streamlit run frontend.py
+
+What happens:
+
+    A new tab will open in your browser (usually at http://localhost:8501).
+
+    You will see your "Movie Review Sentiment Analyzer" app.
+
+    Type "I loved this movie" and click the button. It should show a green "POSITIVE" box.
+
+----------------------------------------------------------------
+Phase 4: Creating Docker files:
+
+1. The High-Level Goal
+
+We took the application that was running loosely on your laptop and packaged it into Docker Containers. This satisfies the requirement for "Containerization: Docker and Docker Compose".
+
+Instead of saying "It works on my machine," we can now say "It works in this box, and you can ship this box anywhere."
+2. The Files: A Deep Dive
+A. The Backend (app.py) - The "Brain"
+
+    Purpose: This script serves the AI model. It listens for requests and returns predictions.
+
+    The Critical Logic (The Fix): The most important part of this file is the Recursive Model Search.
+
+        Problem: On your laptop, MLflow saved the model path as /home/aayush/.... Inside Docker, that path doesn't exist. Docker puts everything in /app.
+
+        Solution: We wrote code that doesn't care about the absolute path. It looks at the current folder (mlruns) and walks through every sub-folder until it finds model.pkl.
+
+        Code Highlight:
+        Python
+
+        for root, dirs, files in os.walk("mlruns"):
+            if "model.pkl" in files:
+                model_uri = root # Found it!
+
+B. The Frontend (frontend.py) - The "Face"
+
+    Purpose: A Streamlit website for users to interact with the model.
+
+    Key Feature 1 (Networking):
+
+        It uses os.getenv("API_URL", ...) to decide where to send data.
+
+        On your laptop, it defaults to localhost. Inside Docker, we configure it to talk to http://backend:8000.
+
+    Key Feature 2 (Robustness):
+
+        We added an if "error" in data: check. This prevents the website from crashing (Red Screen of Death) if the backend has a hiccup.
+
+C. The Recipes (Dockerfile.backend & Dockerfile.frontend)
+
+These files tell Docker how to build the "Shipping Box."
+
+    FROM python:3.9-slim: "Start with a lightweight Linux computer that already has Python installed."
+
+    WORKDIR /app: "Create a folder called /app and do all work inside it."
+
+    COPY requirements.txt . & RUN pip install ...: "Install all the libraries (FastAPI, Streamlit, MLflow) inside the box."
+
+    COPY . .: "Copy the code from Aayush's laptop into the box."
+
+    EXPOSE 8000 / 8501: "Open a specific port (window) so we can talk to the program inside."
+
+D. The Orchestrator (docker-compose.yml)
+
+This is the manager that runs both boxes at the same time and connects them.
+
+    services:: Defines our two players, backend and frontend.
+
+    depends_on:: Tells the frontend not to start until the backend is running.
+
+    volumes: - ./mlruns:/app/mlruns (THE MOST CRITICAL LINE):
+
+        This creates a "wormhole."
+
+        It connects the mlruns folder on your laptop directly to the /app/mlruns folder inside the container.
+
+        Why this matters: When you train a model on your laptop, the file appears instantly inside the container without you needing to rebuild anything.
+
+    environment: - API_URL=http://backend:8000/predict:
+
+        This tells the Frontend: "Don't look for the backend at 'localhost'. Look for a computer named 'backend' on the internal network."
+
+3. The Commands We Used
+1. docker compose up --build
+
+    What it does:
+
+        Reads the Dockerfiles and builds the images (installing Python, libraries, etc.).
+
+        Creates a virtual network (e.g., project_default).
+
+        Starts the containers and streams their logs to your terminal.
+
+    When we used it: Every time we made a small code change.
+
+2. docker compose down
+
+    What it does: Stops the containers and removes them and the network. It cleans up the mess.
+
+    When we used it: Before running the "nuclear" fix to ensure a clean slate.
+
+3. docker compose build --no-cache (The Nuclear Fix)
+
+    Why we needed it: Docker is lazy. If you change a file but Docker thinks "I already built this layer," it ignores your change. We saw this when the logs kept saying "Checked all folders..." even though we deleted that code.
+
+    What it does: It forces Docker to forget everything it knows and rebuild the container from scratch, ensuring the new code is actually used.
+
+User (You) → Browser (localhost:8501)
+
+    Browser → Frontend Container (Streamlit)
+
+    Frontend Container → (via Docker Network) → Backend Container (FastAPI)
+
+    Backend Container → Reads model.pkl from Volume (Your Laptop's Storage)
+
+    Backend → Returns Prediction to Frontend.
+
+You have now completed the Local Development & Containerization phases. The application is portable and ready for the cloud (Kubernetes).
+This is one of the most important concepts in Docker networking, and it confuses almost everyone when they first start.
+
+Here is the simple explanation of why we use 0.0.0.0 instead of localhost or 127.0.0.1.
+The Short Answer
+
+    127.0.0.1 (Localhost): "I will only talk to processes running inside this exact same container. If you are outside the container (like on your laptop), I will ignore you."
+
+    0.0.0.0: "I will listen to any traffic coming from anywhere. Whether it's from inside the container, from another container, or from your laptop—come on in!"
+
+-----------------------------------------------
+
+Phase 5: Kubernetes
+We are now going to stop using Docker Compose (which is for one computer) and switch to Kubernetes (which manages entire clusters).
+
+The Goal:
+
+    Create a Deployment for the Backend (to ensure it stays alive).
+
+    Create a Service for the Backend (so the Frontend can find it).
+
+    Create a Deployment & Service for the Frontend (so you can access it).
+
+Note: For the backend to work in K8s, it needs to access your model. In a real production cluster, we would use a Persistent Volume (PV). Since you are running Minikube or local K8s, we will use a HostPath Volume (just like we did in Docker Compose).
+Step 1: Create the Backend Manifest (k8s-backend.yaml)
+
+Create a file named k8s-backend.yaml -> This has the code to create the backend deployment and service.
+
+Step 2: Create the Frontend Manifest (k8s-frontend.yaml)
+
+Create a file named k8s-frontend.yaml -> This has the code to create the frontend deployment and service.
+
+Step 3: Point Minikube to Local Docker (CRITICAL STEP)
+
+By default, Minikube doesn't see the Docker images you built on your laptop. It has its own internal Docker. We need to point your terminal to Minikube's Docker daemon so we can build the images inside Minikube.
+
+a) Switch context -> eval $(minikube docker-env)
+b) Rebuild images (Inside Minikube): Now that we switched environments, we need to build the images again so they exist inside the cluster.
+docker build -f Dockerfile.backend -t project-backend:latest .
+docker build -f Dockerfile.frontend -t project-frontend:latest .
+
+Step 4: Deploy!
+
+    Apply Backend: kubectl apply -f k8s-backend.yaml
+    Apply Frontend: kubectl apply -f k8s-frontend.yaml
+
+Step 5: Access the App
+
+Since you are using NodePort, Minikube gives you a special command to open the URL directly.
+minikube service frontend-service
+
+Minikube runs inside a virtual machine (or a container). It is like a separate computer running inside your laptop. It cannot see your laptop's hard drive automatically.
+IMPORTANT: Step 1: Mount the Folder (The Bridge)
+
+Crucial: You must do this in a new terminal window, and you must keep this window open as long as your app is running.
+
+    Open a new terminal.
+
+    Run this exact command (I added quotes because your path has spaces in "Semester 7"):
+    minikube mount "/home/aayush-bhargav/Documents/Semester 7/Software Production Engineering/Project/mlruns":/mnt/mlruns
+    Left Side: Your laptop's real folder.
+
+    Right Side: The simplified path inside Minikube (/mnt/mlruns).
+
+Wait until you see a message like Mounting host path ... or User defined volume location.... Do not close this terminal
+
+Step 2: Update the YAML
+
+Now we need to tell Kubernetes to look at the bridge (/mnt/mlruns), not the original path.
+
+    Open k8s-backend.yaml.
+
+    Scroll down to the volumes section.
+
+    Change the path to /mnt/mlruns.
+
+

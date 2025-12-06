@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+      - name: backend
+        # IMPORTANT: Since we haven't pushed images to Docker Hub, 
+        # we will tell K8s to look for the image on your laptop locally.
+        image: aayushbhargav57/mlops-backend:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8000
+        volumeMounts:
+        - name: mlruns-volume
+          mountPath: /app/mlruns
+      volumes:
+      - name: mlruns-volume
+        hostPath:
+          # UPDATE THIS: Use the command `pwd` in your terminal to get the full path.
+          path: "/mnt/mlruns"
+          type: Directory
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend # This is the DNS name the frontend will use
+spec:
+  selector:
+    app: backend
+  ports:
+    - protocol: TCP
+      port: 8000
+      targetPort: 8000
+  type: ClusterIP # Internal only. The frontend is inside the cluster, so this is fine.

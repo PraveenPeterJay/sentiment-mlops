@@ -1,0 +1,28 @@
+services:
+  # SERVICE 1: THE API
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: mlops-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      # THE TRICK: We map your laptop's 'mlruns' folder into the container.
+      # This allows the container to see the model you trained on your laptop!
+      - ./mlruns:/app/mlruns
+      - ./data:/app/data
+
+  # SERVICE 2: THE UI
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: mlops-frontend
+    ports:
+      - "8501:8501"
+    environment:
+      # Here we tell the frontend to talk to the backend container by NAME
+      - API_URL=http://backend:8000/predict
+    depends_on:
+      - backend
