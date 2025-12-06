@@ -3,7 +3,7 @@ pipeline {
 
     environment {
         // Your existing credential ID
-        // Another comment
+        
         DOCKERHUB_CREDENTIALS = credentials('dockerhub_credentials')
         
         // YOUR Docker Hub Username
