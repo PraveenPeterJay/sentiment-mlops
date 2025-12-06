@@ -30,30 +30,27 @@ pipeline {
             steps {
                 echo 'Setting up Python environment and Mock Data...'
                 sh '''
-                # 1. Create venv
                 python3 -m venv venv
                 . venv/bin/activate
                 
-                # 2. Install dependencies
                 pip install --upgrade pip
                 pip install -r requirements.txt
                 
-                # --- THE FIX STARTS HERE ---
-                # 3. CLEANUP: Delete the bad mlruns folder pulled from Git
-                echo "Removing contaminated mlruns folder..."
+                # --- THE FIX ---
+                # Delete the tainted database and folder
+                rm -f mlflow.db
                 rm -rf mlruns
                 
-                # 4. CREATE MOCK DATA
+                # Create Mock Data
                 mkdir -p data
                 echo "review,sentiment" > data/train.csv
                 echo '"This movie was fantastic and I loved it",positive' >> data/train.csv
-                echo '"Terrible acting and boring plot",negative' >> data/train.csv
-                echo '"I will never watch this again",negative' >> data/train.csv
-                echo '"Best film of the year",positive' >> data/train.csv
-                echo '"It was okay average",positive' >> data/train.csv
-                # --- THE FIX ENDS HERE ---
+                echo '"Terrible acting",negative' >> data/train.csv
+                echo '"I will never watch this",negative' >> data/train.csv
+                echo '"Best film",positive' >> data/train.csv
+                echo '"It was okay",positive' >> data/train.csv
                 
-                # 5. Run the Training Test
+                # Run the Test
                 python3 train.py
                 '''
             }
