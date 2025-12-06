@@ -27,22 +27,34 @@ pipeline {
         }
 
         stage('Test') {
-            // fixed the test stage
             steps {
-                echo 'Setting up Python environment for testing...'
+                echo 'Setting up Python environment and Mock Data...'
                 sh '''
-                # 1. Create a virtual environment named 'venv' in the workspace
+                # 1. Create venv
                 python3 -m venv venv
-                
-                # 2. Activate the environment
                 . venv/bin/activate
                 
-                # 3. Install the dependencies (Pandas, MLflow, etc.)
+                # 2. Install dependencies
                 pip install --upgrade pip
                 pip install -r requirements.txt
                 
-                # 4. Run the training script (The actual test)
-                python train.py
+                # 3. CREATE MOCK DATA (The Fix)
+                # Instead of downloading, we write a small CSV file directly.
+                mkdir -p data
+                
+                # Write the header
+                echo "Review,Sentiment" > data/train.csv
+                
+                # Write 5 rows of dummy data (enough to make the code run)
+                echo '"This movie was fantastic and I loved it",positive' >> data/train.csv
+                echo '"Terrible acting and boring plot",negative' >> data/train.csv
+                echo '"I will never watch this again",negative' >> data/train.csv
+                echo '"Best film of the year",positive' >> data/train.csv
+                echo '"It was okay average",positive' >> data/train.csv
+                
+                # 4. Run the Training Test
+                # This will now find data/train.csv and run successfully
+                python3 train.py
                 '''
             }
         }
