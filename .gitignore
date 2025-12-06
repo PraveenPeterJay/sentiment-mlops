@@ -1,0 +1,5 @@
+__pycache__/
+data/*.csv
+dvc_storage/
+mlruns/
+.DS_Store
