@@ -28,30 +28,30 @@ pipeline {
 
         stage('Train Model (CI)') {
             steps {
-                echo 'Pulling REAL Data from DVC...'
+                echo 'Training with Persistent History...'
                 sh '''
                 python3 -m venv venv
                 . venv/bin/activate
                 pip install --upgrade pip
                 pip install -r requirements.txt
                 
-                # 1. CLEANUP
-                rm -rf mlruns
-                rm -f mlflow.db
-                # Note: We do NOT remove the 'data' folder, DVC needs it.
-                
-                # 2. CONFIGURE DVC (The Strong Connection)
-                # We tell Jenkins where the "Storage Locker" is.
-                # Jenkins uses the exact same folder your laptop uses.
+                # 1. SETUP DVC
                 dvc remote add -d -f mylocal /tmp/dvc_store
-                
-                # 3. PULL DATA
-                # This downloads 'data/train.csv' from the storage locker.
-                # It will be the EXACT version you pushed from your laptop.
                 dvc pull
                 
-                # 4. TRAIN
+                # 2. LINK TO PERMANENT HISTORY (The Trick)
+                # Instead of deleting mlruns, we link it to the permanent folder
+                # This way, Run 1, Run 2, Run 3... are all saved forever.
+                ln -s /var/lib/jenkins/mlflow_history mlruns
+                
+                # 3. TRAIN
+                # MLflow will now append the new run to the history
                 python3 train.py
+                
+                # 4. UNLINK (Cleanup for Docker build)
+                # We need to copy the *content* into the docker image, not the link
+                rm mlruns
+                cp -r /var/lib/jenkins/mlflow_history mlruns
                 '''
             }
         }
