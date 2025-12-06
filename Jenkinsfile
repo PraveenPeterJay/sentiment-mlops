@@ -38,22 +38,22 @@ pipeline {
                 pip install --upgrade pip
                 pip install -r requirements.txt
                 
-                # 3. CREATE MOCK DATA (The Fix)
-                # Instead of downloading, we write a small CSV file directly.
+                # --- THE FIX STARTS HERE ---
+                # 3. CLEANUP: Delete the bad mlruns folder pulled from Git
+                echo "Removing contaminated mlruns folder..."
+                rm -rf mlruns
+                
+                # 4. CREATE MOCK DATA
                 mkdir -p data
-                
-                # Write the header
                 echo "review,sentiment" > data/train.csv
-                
-                # Write 5 rows of dummy data (enough to make the code run)
                 echo '"This movie was fantastic and I loved it",positive' >> data/train.csv
                 echo '"Terrible acting and boring plot",negative' >> data/train.csv
                 echo '"I will never watch this again",negative' >> data/train.csv
                 echo '"Best film of the year",positive' >> data/train.csv
                 echo '"It was okay average",positive' >> data/train.csv
+                # --- THE FIX ENDS HERE ---
                 
-                # 4. Run the Training Test
-                # This will now find data/train.csv and run successfully
+                # 5. Run the Training Test
                 python3 train.py
                 '''
             }
