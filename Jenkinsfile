@@ -85,12 +85,10 @@ pipeline {
 
         stage('Update Kubernetes') {
             steps {
-                // Since K8s is already configured to pull 'Always', 
-                // we just need to restart the pods to pick up the new image.
-                // Note: Jenkins needs 'kubectl' installed for this to work.
-                // If not, you can comment this out.
-                sh "kubectl rollout restart deployment/backend-deployment"
-                sh "kubectl rollout restart deployment/frontend-deployment"
+                echo 'Updating K8s Deployment...'
+                // We point kubectl explicitly to the config file we just copied
+                sh "kubectl --kubeconfig=/var/lib/jenkins/kubeconfig rollout restart deployment/backend-deployment"
+                sh "kubectl --kubeconfig=/var/lib/jenkins/kubeconfig rollout restart deployment/frontend-deployment"
             }
         }
     }
