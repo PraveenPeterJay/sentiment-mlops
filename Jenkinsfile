@@ -84,8 +84,12 @@ pipeline {
 
         stage('Update Kubernetes') {
             steps {
-                echo 'Updating K8s Deployment...'
-                // We point kubectl explicitly to the config file we just copied
+                echo 'Applying new K8s Config...'
+                // 1. Apply the YAML files (Updates config like removing volumes)
+                sh "kubectl --kubeconfig=/var/lib/jenkins/kubeconfig apply -f k8s-backend.yaml"
+                sh "kubectl --kubeconfig=/var/lib/jenkins/kubeconfig apply -f k8s-frontend.yaml"
+                
+                // 2. Restart to pick up new images
                 sh "kubectl --kubeconfig=/var/lib/jenkins/kubeconfig rollout restart deployment/backend-deployment"
                 sh "kubectl --kubeconfig=/var/lib/jenkins/kubeconfig rollout restart deployment/frontend-deployment"
             }
