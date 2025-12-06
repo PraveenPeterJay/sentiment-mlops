@@ -499,4 +499,240 @@ Now we need to tell Kubernetes to look at the bridge (/mnt/mlruns), not the orig
 
     Change the path to /mnt/mlruns.
 
+----------------------------------------------------------
+
+Phase 6: CI/CD Automation with Jenkins.
+
+The Goal: We want to automate the workflow so that when you push code to GitHub, Jenkins wakes up, tests it, builds the Docker images, uploads them to the cloud (Docker Hub), and updates your Kubernetes cluster.
+
+Step 0: Create two repositories on your Docker Hub:
+    Name one: mlops-backend
+    Name the second: mlops-frontend
+Step 1: Install "Docker Pipeline" plugin
+Step 2: Add Docker Hub Credentials to Jenkins (Already done in mini Project)
+Step 3: Create the Jenkinsfile
+The Jenkinsfile is a text file that tells Jenkins what to do. It lives in your project folder.
+    Create a file named Jenkinsfile (no extension) in your main folder.
+Step 4: Prepare Your Kubernetes YAMLs for the Cloud
+
+Since we are now pushing to Docker Hub, your Kubernetes files need to pull from there, not locally.
+
+    Open k8s-backend.yaml:
+
+        Change image: project-backend:latest
+
+        To: image: YOUR_DOCKERHUB_USER/mlops-backend:latest
+
+        Change imagePullPolicy: Never
+
+        To: imagePullPolicy: Always
+
+    Open k8s-frontend.yaml:
+
+        Change image: project-frontend:latest
+
+        To: image: YOUR_DOCKERHUB_USER/mlops-frontend:latest
+
+        Change imagePullPolicy: Never
+
+        To: imagePullPolicy: Always
+Step 5:
+Step 6: Push to GitHub
+
+Jenkins needs to fetch the Jenkinsfile from GitHub.
+
+    Go to GitHub.com and create a New Repository named sentiment-mlops.
+
+    Run these commands in your terminal to upload your code:
+    git remote add origin https://github.com/YOUR_GITHUB_USER/sentiment-mlops.git
+    git add .
+    git commit -m "Added Jenkinsfile and updated K8s manifests"
+    git branch -M main
+    git push -u origin main
+Step 7: Create the Jenkins Job
+
+    Go to Jenkins Dashboard (http://localhost:8080).
+
+    Click New Item.
+
+    Name: mlops-pipeline.
+
+    Select Pipeline and click OK.
+
+    Scroll down to Pipeline section.
+
+    Definition: Pipeline script from SCM.
+
+    SCM: Git.
+
+    Repository URL: Paste your GitHub URL (e.g., https://github.com/User/repo.git).
+
+    Branch Specifier: */main.
+
+    Trigger: Use Github webhook-> Set up the webhook as in slides.
+
+Important stuff: 
+-> Verify Jenkins Permission (Crucial)
+Since you are not using the specific Docker container command I gave earlier, you likely have Jenkins installed directly on your machine. Problem: The jenkins user often doesn't have permission to run docker commands by default. Fix: Run this command in your terminal to give Jenkins permission:
+sudo usermod -aG docker jenkins
+sudo systemctl restart jenkins
+
+-> Step 2: Expose Jenkins to the Internet (For Webhooks)
+
+You want to use GitHub Webhooks. The Problem: GitHub is on the internet; your Jenkins is on localhost. GitHub cannot "see" your laptop to send the trigger. The Solution: Use Ngrok to create a tunnel.
+ngrok http 8080
+
+What exactly is being tested?
+
+Unlike your previous Java project where mvn test ran hundreds of tiny unit tests, here we are running an Integration/Smoke Test by executing your actual AI training script (train.py).
+
+Running python3 train.py verifies five critical things at once. If this script finishes without crashing, the test Passes. If it crashes, the pipeline Fails.
+
+    Syntax Check: It proves your Python code (app.py, train.py) doesn't have any typos or syntax errors that would stop it from running.
+
+    Dependency Check: It proves all your libraries (pandas, sklearn, mlflow) are installed and working correctly in the Jenkins environment.
+
+    Data Integrity (DVC): It proves your dataset (data/train.csv) is readable and formatted correctly. If DVC failed to pull the data, this script would crash immediately.
+
+    MLflow Connection: It proves the code can successfully talk to MLflow to log metrics and save the model.
+
+    Model Viability: It proves the machine learning algorithm (Logistic Regression) can actually learn from your data without mathematical errors
+
+What running python train.py actually proves:
+
+When Jenkins runs this command, it isn't just "training" the model; it is secretly verifying 5 critical things that could break your project:
+
+    The Environment is Correct:
+
+        If you forgot to install pandas or scikit-learn in the Jenkins environment, train.py will crash immediately with ModuleNotFoundError.
+
+        Result: The test fails, preventing you from building a broken Docker image.
+
+    The Data is Accessible:
+
+        The script tries to read data/train.csv. If DVC failed to pull the data, or the file is missing/corrupt, the script crashes.
+
+        Result: It proves your Data Pipeline is working.
+
+    The Syntax is Valid:
+
+        If you made a typo in your Python code (e.g., missed a closing parenthesis )), the script won't run.
+
+        Result: It proves your code is valid Python.
+
+    MLflow is Reachable:
+
+        The script tries to log metrics to MLflow. If the MLflow server is down or the directory permissions are wrong, it crashes.
+
+        Result: It proves your Logging infrastructure is up.
+
+    Mathematical Viability:
+
+        If your data has "NaN" (empty values) or text where numbers should be, the model.fit() command will error out.
+
+        Result: It proves your data cleaning logic was successful.
+-> Very IMPORTANT: 
+One Pre-requisite Command
+
+Sometimes the "virtual environment" tool is missing on Linux by default. Run this command in your terminal (not Jenkins) to make sure it is installed:
+sudo apt-get install python3-venv
+
+Also Important:
+Give Jenkins the Map
+
+We need to give the jenkins user a copy of your Kubernetes configuration file so it knows where to find the cluster.
+Step 1: Copy the Kubeconfig
+
+Run these 3 commands in your local terminal to copy your config to a place Jenkins can read:
+# 1. Copy your personal config to the Jenkins folder
+sudo cp ~/.kube/config /var/lib/jenkins/kubeconfig
+
+# 2. Give ownership to the jenkins user
+sudo chown jenkins:jenkins /var/lib/jenkins/kubeconfig
+
+# 3. Make it readable
+sudo chmod 600 /var/lib/jenkins/kubeconfig
+
+# 1. Create a 'flattened' config that embeds the keys directly into the file
+# --flatten: Replaces file paths with the actual certificate data
+# --minify: Only keeps the current cluster info (removes clutter)
+kubectl config view --flatten --minify > temp_kubeconfig
+
+# 2. Move this new self-contained file to the Jenkins folder
+# (We overwrite the old broken one)
+sudo mv temp_kubeconfig /var/lib/jenkins/kubeconfig
+
+# 3. Give ownership to Jenkins again
+sudo chown jenkins:jenkins /var/lib/jenkins/kubeconfig
+sudo chmod 600 /var/lib/jenkins/kubeconfig
+
+
+This is the final piece of the puzzle that closes the "DevOps Loop."
+
+Here is the breakdown of exactly what is happening in that stage and what happens to your application.
+1. What is this stage doing?
+
+It is performing a Rolling Update.
+
+    The Command: kubectl rollout restart deployment/...
+
+        This tells Kubernetes: "Hey, I know the YAML configuration hasn't changed, but I want you to kill the current pods and start fresh ones anyway."
+
+    The Flag: --kubeconfig=/var/lib/jenkins/kubeconfig
+
+        This tells Jenkins: "Use the specific 'Map' (config file) we created earlier to find the cluster. Do not try to guess where it is."
+
+Why is this necessary? In the previous stage (Push to Docker Hub), you uploaded a new version of your image (e.g., you changed the code). However, Kubernetes is lazy. If you don't tell it to restart, it will keep running the old image forever because the Deployment YAML itself didn't change. By forcing a restart, Kubernetes sees imagePullPolicy: Always, checks Docker Hub, sees the newer image hash, and downloads the fresh code.
+2. Are the pods going to restart?
+
+Yes, but intelligently.
+
+Kubernetes does not just kill everything at once (which would crash your website). It performs a "Zero-Downtime Deployment" (even with 1 replica, it tries to be fast, though with multiple replicas it is seamless).
+
+The Sequence of Events:
+
+    Kubernetes: "Okay, time to restart."
+
+    Action: It creates a New Pod (running the new code) alongside the Old Pod.
+
+    Wait: It waits for the New Pod to say "I am Ready" (Running state).
+
+    Switch: It switches the traffic from Old → New.
+
+    Kill: It terminates the Old Pod.
+
+So, your kubectl get pods will temporarily show two backend pods (one Terminating, one Running) before settling back to one.
+3. How do I access the website?
+
+Since you are using Minikube with a NodePort, the address remains exactly the same as before. The "Door" (Port 30001) doesn't move; only the "Room" behind it changes.
+
+Run this command in your local terminal:
+minikube service frontend-service
+
+Or, if you manually set the port to 30001, you can simply go to: http://<MINIKUBE-IP>:30001 (Run minikube ip to see the IP, usually 192.168.49.2).
+Summary of your Full Pipeline Execution
+
+    You Push Code → GitHub.
+
+    GitHub → Pokes Jenkins (Webhook).
+
+    Jenkins →
+
+        Creates a dummy dataset.
+
+        Runs train.py to prove code works.
+
+        Builds Docker Images.
+
+        Pushes to Docker Hub.
+
+        Tells Minikube to Restart.
+
+    Minikube → Pulls new image → Website updates automatically.
+
+You have now achieved full CI/CD automation.
+
+Very Important:
+Before the demo: Kill the terminal window, open a fresh one, and run the mount command newly just to be safe.
+minikube mount "/home/aayush-bhargav/Documents/Semester 7/Software Production Engineering/Project/mlruns":/mnt/mlruns
 
