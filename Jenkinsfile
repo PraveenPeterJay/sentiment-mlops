@@ -26,23 +26,22 @@ pipeline {
             }
         }
 
-        stage('Test') {
+        stage('Train Model (CI)') {
             steps {
-                echo 'Setting up Python environment and Mock Data...'
+                echo 'Training the model inside Jenkins...'
                 sh '''
                 python3 -m venv venv
                 . venv/bin/activate
-                
                 pip install --upgrade pip
                 pip install -r requirements.txt
                 
-                # --- THE FIX ---
-                # Delete the tainted database and folder
-                rm -f mlflow.db
+                # 1. CLEANUP (Start fresh)
                 rm -rf mlruns
-                
-                # Create Mock Data
+                rm -f mlflow.db
                 mkdir -p data
+                
+                # 2. DATA INGESTION (Simulating DVC)
+                # We create the data here. In the "Story", this is DVC pulling data.
                 echo "review,sentiment" > data/train.csv
                 echo '"This movie was fantastic and I loved it",positive' >> data/train.csv
                 echo '"Terrible acting",negative' >> data/train.csv
@@ -50,7 +49,8 @@ pipeline {
                 echo '"Best film",positive' >> data/train.csv
                 echo '"It was okay",positive' >> data/train.csv
                 
-                # Run the Test
+                # 3. TRAIN & LOG TO MLFLOW
+                # This generates the 'mlruns' folder with the new model
                 python3 train.py
                 '''
             }
@@ -58,10 +58,9 @@ pipeline {
 
         stage('Build Docker Images') {
             steps {
-                echo 'Building Backend Image...'
+                echo 'Building Images (With Model Baked In)...'
+                // The Dockerfile now copies the 'mlruns' folder we just created!
                 sh "docker build -f Dockerfile.backend -t ${BACKEND_IMAGE}:${DOCKER_TAG} ."
-                
-                echo 'Building Frontend Image...'
                 sh "docker build -f Dockerfile.frontend -t ${FRONTEND_IMAGE}:${DOCKER_TAG} ."
             }
         }

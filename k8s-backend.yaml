@@ -20,16 +20,7 @@ spec:
         imagePullPolicy: Always
         ports:
         - containerPort: 8000
-        volumeMounts:
-        - name: mlruns-volume
-          mountPath: /app/mlruns
-      volumes:
-      - name: mlruns-volume
-        hostPath:
-          # UPDATE THIS: Use the command `pwd` in your terminal to get the full path.
-          path: "/mnt/mlruns"
-          type: Directory
-
+        # No Volume Mounts Here Anymore
 ---
 apiVersion: v1
 kind: Service
