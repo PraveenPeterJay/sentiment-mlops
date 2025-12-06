@@ -28,9 +28,21 @@ pipeline {
 
         stage('Test') {
             steps {
-                // Run the training script quickly to ensure code integrity
-                echo 'Running Model Training Test...'
-                sh 'python3 train.py' 
+                echo 'Setting up Python environment for testing...'
+                sh '''
+                # 1. Create a virtual environment named 'venv' in the workspace
+                python3 -m venv venv
+                
+                # 2. Activate the environment
+                . venv/bin/activate
+                
+                # 3. Install the dependencies (Pandas, MLflow, etc.)
+                pip install --upgrade pip
+                pip install -r requirements.txt
+                
+                # 4. Run the training script (The actual test)
+                python train.py
+                '''
             }
         }
 
