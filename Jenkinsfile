@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        // My existing credential ID
+        // Your existing credential ID
         
         DOCKERHUB_CREDENTIALS = credentials('dockerhub_credentials')
         
