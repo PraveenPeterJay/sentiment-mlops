@@ -7,7 +7,7 @@ pipeline {
         DOCKERHUB_CREDENTIALS = credentials('dockerhub_credentials')
         
         // YOUR Docker Hub Username
-        DOCKERHUB_USER = "aayushbhargav57" 
+        DOCKERHUB_USER = "praveenpeterjay2" 
         
         // Image Names
         BACKEND_IMAGE = "${DOCKERHUB_USER}/mlops-backend"
@@ -15,7 +15,7 @@ pipeline {
         DOCKER_TAG = "latest"
         
         // Email for notifications
-        EMAIL_ID = "aayushbhargav0507@gmail.com"
+        EMAIL_ID = "praveenpeterjay@gmail.com"
     }
 
     stages {
