@@ -8,7 +8,7 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      # THE TRICK: We map the laptop's 'mlruns' folder into the container.
+      # THE TRICK: We map your laptop's 'mlruns' folder into the container.
       # This allows the container to see the model you trained on your laptop!
       - ./mlruns:/app/mlruns
       - ./data:/app/data
