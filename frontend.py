@@ -133,7 +133,7 @@ if 'review_text' not in st.session_state:
     st.session_state.review_text = ""
 
 user_input = st.text_area("Type your review here:", key="review_text_input", height=150, value=st.session_state.review_text)
-current_review_text = st.session_state.review_text
+current_review_text = st.session_state.review_text_input
 
 # Initialize session state for post-submission message
 if 'post_submission_message' not in st.session_state:
