@@ -77,16 +77,30 @@ def calculate_score_and_status(movies_data, selected_movie_id):
 movies = get_movies()
 movie_names = {m["name"]: m for m in movies}
 
+# --- Preparation for Default State ---
+PLACEHOLDER = "--- Select Movie ---"
+# Create the full list of options, starting with the placeholder
+movie_options = [PLACEHOLDER] + list(movie_names.keys())
+
+# Determine the default index: 0 will be the placeholder
+default_index = 0
+
 # 1. MOVIE SELECTION
 movie_selection = st.selectbox(
     "Select a Movie:",
-    options=list(movie_names.keys()) or ["No movies available"],
-    index=0 if movies else None
+    options=movie_options,
+    index=default_index
 )
 
-selected_movie = movie_names.get(movie_selection)
-selected_movie_id = selected_movie["id"] if selected_movie else None
-
+# --- Logic to handle the selection and prevent immediate display ---
+# If the selection is the placeholder, selected_movie should be None
+if movie_selection == PLACEHOLDER:
+    selected_movie = None
+    selected_movie_id = None
+else:
+    # Otherwise, look up the selected movie data
+    selected_movie = movie_names.get(movie_selection)
+    selected_movie_id = selected_movie["id"] if selected_movie else None
 
 # 2. SCORE & DESCRIPTION DISPLAY (using columns for layout)
 col1, col2 = st.columns([1, 2])
@@ -97,7 +111,7 @@ if selected_movie:
 
     # Column 1: Score Display
     with col1:
-        st.markdown(f"### Score: <span style='color:{color}'>{score:.0f}/100</span>", unsafe_allow_html=True)
+        st.markdown(f"### Score: <span style='color:{color}'>{score:.0f}%</span>", unsafe_allow_html=True)
         st.markdown(f"**Status:** {status}")
         st.caption(f"Based on **{total_reviews}** reviews.")
 
@@ -105,6 +119,10 @@ if selected_movie:
     with col2:
         st.markdown("### Description")
         st.info(selected_movie["description"])
+
+else:
+    # Display a message when the placeholder is selected
+    st.info("Please select a movie from the list above to view its details and submit a review.")
 
 st.markdown("---")
 
@@ -165,4 +183,4 @@ if st.button("Submit Review"):
                 st.write(response.text)
                 
         except requests.exceptions.ConnectionError:
-            st.error("🚨 Connection Error! Is the FastAPI backend running?")
+            st.error("🚨 Connection Error! We are facing some technical difficulties. Please try again later.")
