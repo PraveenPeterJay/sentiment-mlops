@@ -12,6 +12,7 @@ st.markdown("### Powered by MLOps (FastAPI + MLflow + Docker)")
 # Using the same logic for API URL as before, but the base URL.
 API_BASE_URL = os.getenv("API_BASE_URL", "http://127.0.0.1:8000")
 MOVIES_URL = f"{API_BASE_URL}/movies"
+REVIEWS_URL = f"{API_BASE_URL}/reviews"
 SUBMIT_REVIEW_URL = f"{API_BASE_URL}/submit_review"
 
 # --- HELPER FUNCTIONS ---
@@ -70,7 +71,18 @@ def calculate_score_and_status(movies_data, selected_movie_id):
         st.error("🚨 Could not connect to score service.")
         return 0, "No Reviews Yet", 0, "gray"
 
-
+def get_recent_reviews(movie_id):
+    """Fetches the last N recent reviews for a movie from the backend API."""
+    try:
+        review_url = f"{REVIEWS_URL}/{movie_id}"
+        response = requests.get(review_url)
+        if response.status_code == 200:
+            return response.json() 
+        return []
+    except requests.exceptions.ConnectionError:
+        st.error("🚨 Could not connect to the database.")
+        return []
+    
 # --- MAIN APPLICATION LOGIC ---
 
 # Load movies data at the start
@@ -127,8 +139,22 @@ else:
 if selected_movie:
     st.markdown("---")
 
+    st.subheader("Recent Community Reviews")
+    
+    recent_reviews = get_recent_reviews(selected_movie_id)
+
+    if recent_reviews:
+        for i, review in enumerate(recent_reviews):
+            # Display each review in a clean format
+            st.markdown(f"> **Review {i+1}:** {review['text']}")
+            # You might need to format the timestamp from the backend
+            if i < len(recent_reviews) - 1:
+                st.markdown("---") # Separator between reviews
+    else:
+        st.info("Be the first to review this movie!")
+
     # 3. USER INPUT AREA
-    st.write("### Submit Your Review")
+    st.write("### Write Your Own Review")
 
     # Clear the review box BEFORE the text area is drawn
     if st.session_state.get("should_clear_review", False):

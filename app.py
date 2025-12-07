@@ -266,3 +266,9 @@ def submit_and_predict_review(review_input: ReviewInput, db: Session = Depends(g
         "model_version": latest_run_id,
         "message": "Review submitted and analyzed successfully."
     }
+
+@app.get("/reviews/{movie_{id}", response_model=List[MovieReview])
+def get_reviews(movie_id: int, db: Session = Depends(get_db)):
+    recent_reviews = db.reviews.find({"movie_id": movie_id}).sort("review_id", -1).limit(3)
+    
+    return [{"text": r["text"], "review_id": r["review_id"]} for r in recent_reviews]
