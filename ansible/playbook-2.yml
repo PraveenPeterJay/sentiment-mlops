@@ -1,6 +1,6 @@
 ---
 - name: "MLOps CI/CD Stages on Remote Host"
-  hosts: k8s_host
+  hosts: server
   gather_facts: no # No need for facts in this playbook
   vars:
     # Variables passed from the Jenkinsfile environment
