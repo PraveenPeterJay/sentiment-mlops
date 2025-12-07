@@ -1,0 +1,24 @@
+---
+- name: "Provision server for MLOps deployment"
+  hosts: server
+  gather_facts: yes
+  
+  # This section calls the roles defined below
+  roles:
+    - update_system
+    - install_docker
+    - install_kubectl
+
+- name: "Validate Docker Group Membership"
+  hosts: server
+  tasks:
+    - name: "Add remote user to the 'docker' group"
+      # This is crucial for non-root users to run docker commands without 'sudo'
+      ansible.builtin.user:
+        name: "{{ ansible_user }}"
+        groups: docker
+        append: yes
+        
+    - name: "Display message to log out and log back in"
+      ansible.builtin.debug:
+        msg: "IMPORTANT: The user '{{ ansible_user }}' has been added to the 'docker' group. You must log out and log back in (or restart the SSH session) on the target machine for this change to take effect."

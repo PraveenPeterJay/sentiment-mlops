@@ -1,0 +1,16 @@
+---
+- name: "Update all packages"
+  ansible.builtin.apt:
+    update_cache: yes
+    upgrade: dist
+    
+- name: "Install dependencies for Docker/K8s"
+  ansible.builtin.apt:
+    pkg:
+      - apt-transport-https
+      - ca-certificates
+      - curl
+      - gnupg
+      - lsb-release
+      - software-properties-common
+    state: present
