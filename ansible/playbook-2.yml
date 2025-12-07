@@ -27,6 +27,7 @@
 
     - name: 1. TRAIN MODEL (CI)
       ansible.builtin.shell: |
+        echo "Starting MLOps training steps..." # <-- Added simple command
         set -e # Exit immediately if a command fails
         cd /home/{{ ansible_user }}/project_workspace
         
@@ -40,9 +41,7 @@
         dvc remote add -d -f mylocal /tmp/dvc_store
         dvc pull
         
-        # Handle MLflow history link (assuming setup is done as described)
-        # Note: This requires /var/lib/jenkins/mlflow_history to be accessible/created on the remote host
-        # For simplicity, if this path doesn't exist, you might use a local folder or stick to the original rm -rf mlruns
+        # Handle MLflow history link (Ensure this block is indented consistently)
         ln -s /var/lib/jenkins/mlflow_history mlruns
         python3 train.py
         rm mlruns
