@@ -30,7 +30,7 @@ pipeline {
                 echo 'Running Configuration Management playbook (install Docker/K8s tools)...'
                 
                 sh "ansible-playbook -i ansible/inventory.ini ansible/playbook-1.yml"
-                
+
                 echo 'Remote host configured and ready for deployment.'
             }
         }
@@ -39,7 +39,7 @@ pipeline {
             steps {
                 echo 'Executing full CI/CD pipeline on the configured Ansible Host...'
                 
-                sh "ansible-playbook -i ansible/inventory.ini ansible.playbook-2.yml --extra-vars 'workspace=${WORKSPACE}'"
+                sh "ansible-playbook -i ansible/inventory.ini ansible/playbook-2.yml --extra-vars 'workspace=${WORKSPACE}'"
             }
         }
 
