@@ -164,10 +164,8 @@ if selected_movie:
     user_input = st.text_area("Type your review here:", key="review_text_input", height=150)
     current_review_text = st.session_state.review_text_input
 
-    # Clear message on movie selection change (if needed)
-    if movie_selection != st.session_state.get('last_selected_movie') and st.session_state.post_submission_message:
+    if "post_submission_message" not in st.session_state:
         st.session_state.post_submission_message = None
-    st.session_state.last_selected_movie = movie_selection
 
     # 4. THE "SUBMIT REVIEW" BUTTON
     if st.button("Submit Review"):
@@ -235,7 +233,6 @@ if selected_movie:
                     
             except requests.exceptions.ConnectionError:
                 st.error("🚨 Connection Error! We are facing some technical difficulties. Please try again later.")
-
 
     # Display the message outside the button block so it persists during rerun
     if st.session_state.post_submission_message:
