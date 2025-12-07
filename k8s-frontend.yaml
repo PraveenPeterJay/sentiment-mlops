@@ -19,9 +19,9 @@ spec:
         ports:
         - containerPort: 8501
         env:
-        - name: API_URL
+        - name: API_BASE_URL
           # K8s DNS Magic: It finds the service named 'backend' automatically
-          value: "http://backend:8000/predict"
+          value: "http://backend:8000"
 
 ---
 apiVersion: v1

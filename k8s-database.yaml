@@ -1,0 +1,71 @@
+# 1. Persistent Volume Claim (PVC) - Requesting Storage
+# This claim asks Kubernetes for storage that can be used by the DB container.
+# The data will persist across container/pod restarts and redeployments.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-pvc
+spec:
+  accessModes:
+    # Allows the volume to be mounted as read-write by a single node.
+    - ReadWriteOnce
+  resources:
+    # Requesting 1 Gigabyte of storage space
+    requests:
+      storage: 1Gi
+
+---
+# 2. Database Deployment (PostgreSQL)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres-deployment
+  labels:
+    app: postgres
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:15-alpine # A stable, lightweight PostgreSQL image
+        ports:
+        - containerPort: 5432
+        # Environment variables for database configuration
+        env:
+        - name: POSTGRES_DB
+          value: "rotten_potatoes_db"
+        - name: POSTGRES_USER
+          value: "user"
+        - name: POSTGRES_PASSWORD
+          # IMPORTANT: Use a Kubernetes Secret in production, but for this
+          # example, we use a literal value.
+          value: "password"
+        # Mount the PVC to a directory inside the container
+        volumeMounts:
+        - mountPath: /var/lib/postgresql/data
+          name: postgres-storage
+      volumes:
+      - name: postgres-storage
+        persistentVolumeClaim:
+          claimName: postgres-pvc
+
+---
+# 3. Database Service - Makes the DB accessible via a DNS name (postgres-service)
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-service # Other services will connect using this name: "postgres-service"
+spec:
+  selector:
+    app: postgres
+  ports:
+    - protocol: TCP
+      port: 5432 # The port other services will use (K8s Service port)
+      targetPort: 5432 # The port the Postgres container is listening on

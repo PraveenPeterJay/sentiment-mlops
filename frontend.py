@@ -2,63 +2,166 @@ import streamlit as st
 import requests
 import json
 import os
-# 1. PAGE CONFIGURATION
-# Set the title and icon of the tab in the browser
-st.set_page_config(page_title="Sentiment Analyzer", page_icon="🎬")
 
-# 2. TITLE AND HEADER
-st.title("🎬 Movie Review Sentiment Analyzer")
+# --- CONFIGURATION ---
+st.set_page_config(page_title="Rotten Potatoes", page_icon="🥔")
+st.title("🥔 Rotten Potatoes: The Ultimate Movie Review Hub")
 st.markdown("### Powered by MLOps (FastAPI + MLflow + Docker)")
-st.write("Enter a movie review below to see if it's Positive or Negative.")
 
-# 3. USER INPUT
-# A text area for the user to type the review
-user_input = st.text_area("Type your review here:", height=150)
+# --- API ENDPOINTS ---
+# Using the same logic for API URL as before, but the base URL.
+API_BASE_URL = os.getenv("API_BASE_URL", "http://127.0.0.1:8000")
+MOVIES_URL = f"{API_BASE_URL}/movies"
+SUBMIT_REVIEW_URL = f"{API_BASE_URL}/submit_review"
 
-# 4. THE "PREDICT" BUTTON
-if st.button("Analyze Sentiment"):
-    if user_input.strip() == "":
+# --- HELPER FUNCTIONS ---
+
+def get_movies():
+    """Fetches the list of movies from the backend API."""
+    try:
+        response = requests.get(MOVIES_URL)
+        if response.status_code == 200:
+            # Expecting a list of dicts: [{"id": 1, "name": "...", "description": "..."}, ...]
+            return response.json()
+        st.error(f"Error fetching movies: {response.status_code}")
+        return []
+    except requests.exceptions.ConnectionError:
+        st.error("🚨 Connection Error! We are facing some technical difficulties. Please try again later.")
+        return []
+
+def calculate_score_and_status(movies_data, selected_movie_id):
+    """
+    Calculates the freshness score and status based on the movie_id.
+    This function will now use a dedicated API endpoint /score/<movie_id>
+    which your backend needs to implement.
+    """
+    if not selected_movie_id:
+        return None, None, None
+
+    try:
+        score_url = f"{API_BASE_URL}/score/{selected_movie_id}"
+        response = requests.get(score_url)
+
+        if response.status_code == 200:
+            data = response.json()
+            # Expected response: {"total_reviews": 30, "positive_count": 25, "score": 83.33}
+            score = data.get("score")
+            total_reviews = data.get("total_reviews")
+            
+            if score is not None:
+                if score >= 75:
+                    status = "CERTIFIED HOT 🍟"
+                    color = "green"
+                elif score >= 60:
+                    status = "FRESH 🥔"
+                    color = "orange"
+                else:
+                    status = "ROTTEN 🤮"
+                    color = "red"
+                
+                return score, status, total_reviews, color
+            
+            return 0, "No Reviews Yet", 0, "gray"
+
+        st.warning("Could not fetch score. Assuming no reviews yet.")
+        return 0, "No Reviews Yet", 0, "gray"
+
+    except requests.exceptions.ConnectionError:
+        st.error("🚨 Could not connect to score service.")
+        return 0, "No Reviews Yet", 0, "gray"
+
+
+# --- MAIN APPLICATION LOGIC ---
+
+# Load movies data at the start
+movies = get_movies()
+movie_names = {m["name"]: m for m in movies}
+
+# 1. MOVIE SELECTION
+movie_selection = st.selectbox(
+    "Select a Movie:",
+    options=list(movie_names.keys()) or ["No movies available"],
+    index=0 if movies else None
+)
+
+selected_movie = movie_names.get(movie_selection)
+selected_movie_id = selected_movie["id"] if selected_movie else None
+
+
+# 2. SCORE & DESCRIPTION DISPLAY (using columns for layout)
+col1, col2 = st.columns([1, 2])
+
+if selected_movie:
+    # Calculate score and status
+    score, status, total_reviews, color = calculate_score_and_status(movies, selected_movie_id)
+
+    # Column 1: Score Display
+    with col1:
+        st.markdown(f"### Score: <span style='color:{color}'>{score:.0f}/100</span>", unsafe_allow_html=True)
+        st.markdown(f"**Status:** {status}")
+        st.caption(f"Based on **{total_reviews}** reviews.")
+
+    # Column 2: Description
+    with col2:
+        st.markdown("### Description")
+        st.info(selected_movie["description"])
+
+st.markdown("---")
+
+# 3. USER INPUT AREA
+st.write("### Submit Your Review")
+# Use session state to manage and clear the input box
+if 'review_text' not in st.session_state:
+    st.session_state.review_text = ""
+
+user_input = st.text_area("Type your review here:", key="review_text_input", height=150, value=st.session_state.review_text)
+
+# 4. THE "SUBMIT REVIEW" BUTTON
+if st.button("Submit Review"):
+    if not selected_movie_id:
+        st.error("Please select a valid movie first.")
+    elif user_input.strip() == "":
         st.warning("Please enter some text first.")
     else:
-        # 5. CONNECT TO BACKEND
-        # This is where the Frontend talks to the Backend (The API we just built)
-        # If we are in Docker, use the environment variable 'API_URL'.
-        # If we are on your laptop, default to localhost.
-        api_url = os.getenv("API_URL", "http://127.0.0.1:8000/predict")
-        
-        # Prepare the payload (the data to send)
-        payload = {"text": user_input}
+        # 5. CONNECT TO BACKEND (New Submit Endpoint)
+        payload = {
+            "movie_id": selected_movie_id,
+            "text": user_input
+        }
         
         try:
-            # Show a spinner while waiting for the response
-            with st.spinner("Analyzing..."):
-                response = requests.post(api_url, json=payload)
+            with st.spinner("Analyzing and Saving Review..."):
+                # Call the new endpoint that BOTH predicts AND saves to DB
+                response = requests.post(SUBMIT_REVIEW_URL, json=payload)
             
             # 6. DISPLAY RESULTS
             if response.status_code == 200:
                 data = response.json()
                 
-                # SAFETY CHECK: Did we actually get a result?
-                if "result" in data:
-                    sentiment = data["result"]
+                if "sentiment" in data:
+                    sentiment = data["sentiment"]
                     model_id = data.get("model_version", "Unknown")
                     
+                    # Custom success/error message
                     if sentiment.lower() == "positive":
-                        st.success(f"**Sentiment: {sentiment.upper()}** 😃")
+                        st.success(f"**Thank you for your POSITIVE review!** 🎉")
                     else:
-                        st.error(f"**Sentiment: {sentiment.upper()}** 😡")
+                        st.error(f"**Thank you for your NEGATIVE review.** We appreciate your honesty.")
                     
                     st.caption(f"Prediction served by Model Version: {model_id}")
+                    
+                    # Clear the review box and re-run the script to update the score
+                    st.session_state.review_text = ""
+                    st.experimental_rerun() # Rerun to refresh score and clear text area
                 
-                # If the backend sent an error inside the JSON
                 elif "error" in data:
                     st.error(f"Backend Error: {data['error']}")
                 else:
                     st.error("Unknown response format from API.")
-                    st.write(data) # Print the raw data to debug
+                    st.write(data)
                 
             else:
-                st.error(f"Error {response.status_code}: Could not contact the model.")
+                st.error(f"Error {response.status_code}: Could not submit review to the model.")
                 st.write(response.text)
                 
         except requests.exceptions.ConnectionError:
