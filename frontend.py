@@ -147,6 +147,10 @@ if selected_movie:
         st.session_state.post_submission_message = None
     st.session_state.last_selected_movie = movie_selection
 
+    if st.session_state.get("clear_post_submission_message", False):
+        st.session_state.post_submission_message = None
+        st.session_state.clear_post_submission_message = False
+
     # Display the message outside the button block so it persists during rerun
     if st.session_state.post_submission_message:
         message_type = st.session_state.post_submission_message['type']
@@ -159,21 +163,22 @@ if selected_movie:
 
     # 4. THE "SUBMIT REVIEW" BUTTON
     if st.button("Submit Review"):
-        # Clear any previous message before attempting a new submission
-        st.session_state.post_submission_message = None
         
         review_words = current_review_text.strip().split()
 
         if not selected_movie_id:
             st.error("Please select a valid movie first.")
+            st.session_state.clear_post_submission_message = True
             
         # --- New 5-word minimum check ---
         elif len(review_words) < 5:
             st.warning("Please ensure your review has at least **5 words**.")
+            st.session_state.clear_post_submission_message = True
             
         elif current_review_text.strip() == "":
             # This check is now mostly redundant due to the word count check, but good for safety
             st.warning("Please enter some text first.")
+            st.session_state.clear_post_submission_message = True
             
         else:
             # 5. CONNECT TO BACKEND (New Submit Endpoint)
