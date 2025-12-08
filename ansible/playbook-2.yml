@@ -96,14 +96,19 @@
         docker logout
       become: yes
 
-    # Your existing shell task for deployments remains the same
     - name: 4. UPDATE KUBERNETES DEPLOYMENT
       ansible.builtin.shell: |
         set -e
         cd /home/{{ ansible_user }}/project_workspace
-        kubectl --kubeconfig={{ kubeconfig_path }} apply -f k8s-backend.yaml
+
+        kubectl --kubeconfig={{ kubeconfig_path }} apply -f k8s-logging.yaml
         kubectl --kubeconfig={{ kubeconfig_path }} apply -f k8s-database.yaml
+
+        kubectl --kubeconfig={{ kubeconfig_path }} apply -f k8s-backend.yaml
         kubectl --kubeconfig={{ kubeconfig_path }} apply -f k8s-frontend.yaml
+
         kubectl --kubeconfig={{ kubeconfig_path }} rollout restart deployment/backend-deployment
         kubectl --kubeconfig={{ kubeconfig_path }} rollout restart deployment/frontend-deployment
       become: yes
+
+      
