@@ -19,17 +19,36 @@
         owner: "{{ ansible_user }}"
         mode: '0755'
 
-    - name: Copy project files to remote host
+    # 💡 STEP A: Copy Code, Pointers, and Config (Excluding the heavy cache)
+    - name: Copy Code, Config, and DVC Pointers
       ansible.builtin.synchronize:
         src: "{{ workspace }}/"
         dest: /home/{{ ansible_user }}/project_workspace/
         mode: push
-    
+        archive: yes
+        # Exclude the heavy cache files to speed up the main sync
+        rsync_opts:
+          - "--exclude=.dvc/cache" 
+
+    # 💡 STEP B: Copy the DVC Cache Contents (The heavy files)
+    # This task explicitly transfers the *contents* of the hidden cache folder.
+    - name: Copy DVC Cache Contents (The Heavy Data)
+      ansible.builtin.synchronize:
+        # 💡 SOURCE FIX: Target the CONTENTS of the local cache
+        src: "{{ workspace }}/.dvc/cache/" 
+        # Destination: Copy into the remote project's cache folder
+        dest: /home/{{ ansible_user }}/project_workspace/.dvc/cache/
+        mode: push
+        archive: yes
+        # Ensure ownership and permissions are correct during transfer
+        rsync_opts:
+          - "--chown={{ ansible_user }}:{{ ansible_user }}"
+          - "--chmod=Du=rwx,Dg=rx,Do=rx"
+
     - name: Ensure DVC cache files are readable by the remote user
       ansible.builtin.file:
         path: /home/{{ ansible_user }}/project_workspace/.dvc/cache
         state: directory
-        # Set the files to be readable and executable by the owner and group
         mode: '0755' 
         recurse: yes
 
