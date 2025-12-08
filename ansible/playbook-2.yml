@@ -18,6 +18,13 @@
         state: directory
         owner: "{{ ansible_user }}"
         mode: '0755'
+      
+    - name: Copy MLflow history to remote host
+      ansible.builtin.synchronize:
+        src: "/var/lib/jenkins/mlflow_history/"
+        dest: "/home/{{ ansible_user }}/mlflow_history/"
+        mode: push
+        archive: yes
 
     - name: Copy Code, Config, and DVC Pointers
       ansible.builtin.synchronize:
@@ -25,9 +32,6 @@
         dest: /home/{{ ansible_user }}/project_workspace/
         mode: push
         archive: yes
-        # Exclude the heavy cache files to speed up the main sync
-        rsync_opts:
-          - "--exclude=.dvc/cache" 
 
     - name: 1. TRAIN MODEL (CI)
       ansible.builtin.shell: |
@@ -41,16 +45,16 @@
         pip install --upgrade pip
         pip install -r requirements.txt
 
-        dvc remote remove mylocal || true
-        dvc remote remove jenkins_local_archive || true
-        dvc remote add -d -f jenkins_local_archive /var/jenkins_dvc_storage
-        dvc pull
+        # dvc remote remove mylocal || true
+        # dvc remote remove jenkins_local_archive || true
+        # dvc remote add -d -f jenkins_local_archive /var/jenkins_dvc_storage
+        # dvc pull
         
         # Handle MLflow history link (Ensure this block is indented consistently)
-        ln -s /var/lib/jenkins/mlflow_history mlruns
+        ln -s /home/{{ ansible_user }}/mlflow_history mlruns
         python3 train.py
         rm mlruns
-        cp -r /var/lib/jenkins/mlflow_history mlruns
+        cp -r /home/{{ ansible_user }}/mlflow_history mlruns
       args:
         chdir: /home/{{ ansible_user }}/project_workspace
 
