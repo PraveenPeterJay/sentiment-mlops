@@ -16,3 +16,9 @@
     name: "{{ ansible_user }}"
     groups: docker
     append: yes
+
+- name: Force user's new 'docker' group membership to take effect
+  ansible.builtin.shell: |
+    newgrp docker || true
+  become: false
+  changed_when: true
