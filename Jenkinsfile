@@ -29,7 +29,7 @@ pipeline {
             steps {
                 echo 'Running Configuration Management playbook (install Docker/K8s tools)...'
                 
-                withCredentials([string(credentialsId: 'ansible-vault-sudo-pass', 
+                withCredentials([string(credentialsId: 'sudo_pwd_vault_credentials', 
                     variable: 'VAULT_SECRET')]) {
                             sh """
                             ANSIBLE_VAULT_PASSWORD="${VAULT_SECRET}" \\
