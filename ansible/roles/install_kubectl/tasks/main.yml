@@ -28,9 +28,8 @@
 
 - name: Check Minikube status
   become: false
-  ansible.builtin.command: minikube status --format='{{.Host}}'
+  ansible.builtin.command: minikube status --format='{{ "{{.Host}}" }}'
   register: minikube_status
-  ignore_errors: true
   changed_when: false
 
 - name: Start Minikube with Docker driver
