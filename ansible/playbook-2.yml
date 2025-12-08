@@ -73,8 +73,6 @@
         chdir: /home/{{ ansible_user }}/project_workspace
       become: yes
 
-    # (Tasks 2, 3, and 4 are fine)
-
     - name: 2. BUILD DOCKER IMAGES
       ansible.builtin.shell: |
         set -e
@@ -83,6 +81,7 @@
         docker build -f Dockerfile.frontend -t {{ frontend_image }}:{{ docker_tag }} .
       args:
         chdir: /home/{{ ansible_user }}/project_workspace
+      become: yes
 
     - name: 3. PUSH TO DOCKER HUB
       ansible.builtin.shell: |
@@ -92,6 +91,7 @@
         docker push {{ backend_image }}:{{ docker_tag }}
         docker push {{ frontend_image }}:{{ docker_tag }}
         docker logout
+      become: yes
 
     - name: 4. UPDATE KUBERNETES DEPLOYMENT
       ansible.builtin.shell: |
@@ -108,3 +108,4 @@
         kubectl --kubeconfig={{ kubeconfig_path }} rollout restart deployment/frontend-deployment
       args:
         chdir: /home/{{ ansible_user }}/project_workspace
+      become: yes
