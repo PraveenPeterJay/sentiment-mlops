@@ -33,15 +33,14 @@
   failed_when: false
   changed_when: false
 
-- name: Start Minikube with Docker driver
+- name: Start Minikube with Docker driver as iiitb
   become: false
   ansible.builtin.shell: |
+    minikube delete --all --purge || true
     minikube start --driver=docker
+    minikube update-context
   register: minikube_start
-  when: minikube_status.stdout != "Running"
-  changed_when: "'minikube' in minikube_start.stdout or minikube_start.stderr != ''"
-  failed_when:
-    - "'Exiting' in minikube_start.stderr"
+  failed_when: "'Exiting' in minikube_start.stdout or 'Exiting' in minikube_start.stderr"
 
 - name: Display Minikube final status
   become: false
