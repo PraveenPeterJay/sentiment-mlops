@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: frontend
-        image: praveenpeterjay2/mlops-frontend:latest
+        image: aayushbhargav57/mlops-frontend:latest
         imagePullPolicy: Always
         ports:
         - containerPort: 8501

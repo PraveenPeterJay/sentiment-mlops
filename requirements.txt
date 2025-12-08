@@ -9,4 +9,5 @@ requests
 protobuf==4.25.3
 dvc
 sqlalchemy          
-psycopg2-binary       
+psycopg2-binary 
+python-json-logger
