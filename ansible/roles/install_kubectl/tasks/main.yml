@@ -26,10 +26,10 @@
     mode: '0755'
   when: not minikube_bin.stat.exists
 
-- name: Start Minikube with Docker driver
+- name: Start Minikube with Docker drive
+  become: false
   ansible.builtin.shell: |
     minikube start --driver=docker
-  become: false
   register: minikube_start
   changed_when: true
   failed_when: "'Exiting' in minikube_start.stdout or 'Exiting' in minikube_start.stderr"
