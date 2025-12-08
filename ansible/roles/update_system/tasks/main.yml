@@ -17,3 +17,10 @@
       - rsync
       - python3-venv
     state: present
+
+- name: "Ensure DVC cache storage has universal read/write permissions"
+  ansible.builtin.file:
+    path: /tmp/dvc_store
+    state: directory
+    mode: '0777'
+    recurse: yes

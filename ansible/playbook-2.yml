@@ -24,6 +24,14 @@
         src: "{{ workspace }}/"
         dest: /home/{{ ansible_user }}/project_workspace/
         mode: push
+    
+    - name: Ensure DVC cache files are readable by the remote user
+      ansible.builtin.file:
+        path: /home/{{ ansible_user }}/project_workspace/.dvc/cache
+        state: directory
+        # Set the files to be readable and executable by the owner and group
+        mode: '0755' 
+        recurse: yes
 
     - name: 1. TRAIN MODEL (CI)
       ansible.builtin.shell: |
