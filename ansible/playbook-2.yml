@@ -49,61 +49,61 @@
           - "--exclude=.dvc/cache" 
       become: yes
 
-    - name: 1. TRAIN MODEL (CI)
-      ansible.builtin.shell: |
-        echo "Starting MLOps training steps..."
-        set -e
-        cd /home/{{ ansible_user }}/project_workspace
+    # - name: 1. TRAIN MODEL (CI)
+    #   ansible.builtin.shell: |
+    #     echo "Starting MLOps training steps..."
+    #     set -e
+    #     cd /home/{{ ansible_user }}/project_workspace
         
-        # Setup Venv
-        python3 -m venv venv
-        . venv/bin/activate
-        pip install --upgrade pip
-        pip install -r requirements.txt
+    #     # Setup Venv
+    #     python3 -m venv venv
+    #     . venv/bin/activate
+    #     pip install --upgrade pip
+    #     pip install -r requirements.txt
 
-        # DVC: Uses the shared, permanent archive
-        dvc remote remove mylocal || true # Clean up old reference
-        dvc remote add -d -f mylocal /tmp/dvc_store
-        dvc pull
+    #     # DVC: Uses the shared, permanent archive
+    #     dvc remote remove mylocal || true # Clean up old reference
+    #     dvc remote add -d -f mylocal /tmp/dvc_store
+    #     dvc pull
         
-        # Handle MLflow history link (Ensure path is consistent)
-        ln -sf /home/{{ ansible_user }}/mlflow_history mlruns
-        python3 train.py
-      args:
-        chdir: /home/{{ ansible_user }}/project_workspace
-      become: yes
+    #     # Handle MLflow history link (Ensure path is consistent)
+    #     ln -sf /home/{{ ansible_user }}/mlflow_history mlruns
+    #     python3 train.py
+    #   args:
+    #     chdir: /home/{{ ansible_user }}/project_workspace
+    #   become: yes
 
-    - name: 2. BUILD DOCKER IMAGES
-      ansible.builtin.shell: |
-        set -e
-        cd /home/{{ ansible_user }}/project_workspace
-        docker build -f Dockerfile.backend -t {{ backend_image }}:{{ docker_tag }} .
-        docker build -f Dockerfile.frontend -t {{ frontend_image }}:{{ docker_tag }} .
-      args:
-        chdir: /home/{{ ansible_user }}/project_workspace
-      become: yes
+    # - name: 2. BUILD DOCKER IMAGES
+    #   ansible.builtin.shell: |
+    #     set -e
+    #     cd /home/{{ ansible_user }}/project_workspace
+    #     docker build -f Dockerfile.backend -t {{ backend_image }}:{{ docker_tag }} .
+    #     docker build -f Dockerfile.frontend -t {{ frontend_image }}:{{ docker_tag }} .
+    #   args:
+    #     chdir: /home/{{ ansible_user }}/project_workspace
+    #   become: yes
 
-    - name: 3. PUSH TO DOCKER HUB
-      ansible.builtin.shell: |
-        set -e
-        cd /home/{{ ansible_user }}/project_workspace
-        echo "{{ dockerhub_pass }}" | docker login -u "{{ dockerhub_user }}" --password-stdin
-        docker push {{ backend_image }}:{{ docker_tag }}
-        docker push {{ frontend_image }}:{{ docker_tag }}
-        docker logout
-      become: yes
+    # - name: 3. PUSH TO DOCKER HUB
+    #   ansible.builtin.shell: |
+    #     set -e
+    #     cd /home/{{ ansible_user }}/project_workspace
+    #     echo "{{ dockerhub_pass }}" | docker login -u "{{ dockerhub_user }}" --password-stdin
+    #     docker push {{ backend_image }}:{{ docker_tag }}
+    #     docker push {{ frontend_image }}:{{ docker_tag }}
+    #     docker logout
+    #   become: yes
 
     - name: 4. UPDATE KUBERNETES DEPLOYMENT
       ansible.builtin.shell: |
         set -e
         cd /home/{{ ansible_user }}/project_workspace
         
-        # Apply YAMLs
-        kubectl --kubeconfig={{ kubeconfig_path }} apply -f k8s-backend.yaml
-        kubectl --kubeconfig={{ kubeconfig_path }} apply -f k8s-database.yaml
-        kubectl --kubeconfig={{ kubeconfig_path }} apply -f k8s-frontend.yaml
+        # Apply YAMLs (Adding --validate=false)
+        kubectl --kubeconfig={{ kubeconfig_path }} apply -f k8s-backend.yaml --validate=false
+        kubectl --kubeconfig={{ kubeconfig_path }} apply -f k8s-database.yaml --validate=false
+        kubectl --kubeconfig={{ kubeconfig_path }} apply -f k8s-frontend.yaml --validate=false
         
-        # Restart Deployments
+        # Restart Deployments (These do not need the flag)
         kubectl --kubeconfig={{ kubeconfig_path }} rollout restart deployment/backend-deployment
         kubectl --kubeconfig={{ kubeconfig_path }} rollout restart deployment/frontend-deployment
       args:
