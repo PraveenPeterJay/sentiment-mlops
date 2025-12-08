@@ -42,6 +42,7 @@
         pip install -r requirements.txt
 
         dvc remote remove mylocal || true
+        dvc remote remove jenkins_local_archive || true
         dvc remote add -d -f jenkins_local_archive /var/jenkins_dvc_storage
         dvc pull
         
