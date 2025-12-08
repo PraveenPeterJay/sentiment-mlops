@@ -1009,3 +1009,175 @@ Goal: Prove you aren't hardcoding passwords in your code.
     The Integration: We update the Backend Pod to "fetch" this secret from Vault when it starts, instead of reading it from a file.
 
 Which one would you like to execute next? (I recommend Phase 7 (HPA) first as it connects directly to the Kubernetes work we just finished.)
+
+-----------------------------------
+
+Project Report: ELK Stack Integration for MLOps Observability
+1. Objective
+
+The goal was to move beyond simple console printing and implement a centralized logging system. This ensures that in a distributed system (Kubernetes), all application logs are aggregated, searchable, and visualizable in real-time. This satisfies the project requirement for "Monitoring and Observability."
+2. Architecture Overview
+
+Due to resource constraints on the local Minikube environment, we implemented a "Slim" ELK Architecture:
+
+    Elasticsearch (The Database): Stores and indexes log data.
+
+    Kibana (The Dashboard): Provides a UI to search and visualize logs.
+
+    Direct Ingestion (No Logstash): Instead of running a heavy Logstash container, the Python backend formats logs as JSON and ships them directly to Elasticsearch via HTTP.
+
+3. Implementation Details
+A. Infrastructure Setup (Kubernetes)
+
+We created a new manifest, k8s-logging.yaml, to deploy the logging infrastructure.
+
+    Elasticsearch: Deployed as a single-node cluster with memory limits (512Mi - 1Gi) to prevent system crashes. Exposed internally on port 9200.
+
+    Kibana: Deployed and connected to Elasticsearch. Exposed via NodePort 30002, making the dashboard accessible at http://<NodeIP>:30002.
+
+B. Application Integration (Python Backend)
+
+We modified app.py to act as a log shipper.
+
+    Custom Handler: We encountered a compatibility issue with the cmreslogging library on Python 3.12. We resolved this by implementing a custom class, SimpleElasticsearchHandler. This handler uses the standard requests library to send asynchronous POST requests to the Elasticsearch service.
+
+    Structured Logging: We replaced standard print statements with log.info() and log.error().
+
+    Contextual Data: The logs are not just text; they now include structured timestamps (datetime.timezone.utc) and event details (e.g., "AI Prediction: Positive", "Database Success").
+
+Key Code Snippet (The Custom Handler):
+Python
+
+class SimpleElasticsearchHandler(logging.Handler):
+    def emit(self, record):
+        payload = {
+            "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            "level": record.levelname,
+            "message": self.format(record),
+            # ... additional metadata
+        }
+        requests.post(self.url, headers=self.headers, json=payload, timeout=1)
+
+C. Pipeline Automation (Jenkins)
+
+The Jenkinsfile was updated to automate the deployment of the logging stack.
+
+    Stage Update: The "Update Kubernetes" stage was modified to apply the logging infrastructure before the application deployment:
+    Groovy
+
+    sh "kubectl --kubeconfig=... apply -f k8s-logging.yaml"
+
+    This ensures the logging database is ready before the backend starts trying to send logs.
+
+4. Configuration & Validation
+
+    Index Management: We verified that logs were physically reaching the database by checking Stack Management > Index Management, which showed the rotten_potatoes_logs index containing documents.
+
+    Index Patterns: We configured Kibana to recognize the incoming data by creating an index pattern rotten_potatoes_logs* and linking it to the @timestamp field.
+
+5. Data Flow Summary
+
+    Trigger: User submits a movie review on the Frontend.
+
+    Processing: Backend (app.py) receives the request and runs the ML model.
+
+    Logging: The app generates a JSON log entry: {"level": "INFO", "message": "Prediction: Positive"}.
+
+    Transport: The SimpleElasticsearchHandler sends this JSON via HTTP to http://elasticsearch:9200.
+
+    Visualization: The Admin views the log in real-time on the Kibana Dashboard (Port 30002).
+
+6. Outcome
+
+The system now possesses a robust observability layer. We can trace a request from the moment it hits the API, through the ML prediction process, to its final storage in PostgreSQL, entirely through the Kibana interface without needing to SSH into containers
+
+Access Kibana:
+
+    Run kubectl port-forward svc/kibana 5601:5601 in a new terminal.
+
+    Open http://localhost:5601.
+
+    Go to Management > Stack Management > Index Patterns.
+
+    Create a pattern for rotten_potatoes_logs*.
+
+    Go to Discover. You will see your real-time application logs appearing on the dashboard!
+
+
+TODO
+To make this work in Ansible, your teammate needs to use the Kibana API. Kibana allows you to create index patterns programmatically by sending a specific "Internet Signal" (HTTP Request) to it.
+
+Here is exactly what your teammate needs to add to their Ansible playbook (playbook-2.yml) to automate the ELK setup fully.
+The Strategy: "Talk to the Robot, not the Screen"
+
+Instead of a human opening Chrome, Ansible will use the uri module (which is like curl) to tell Kibana: "Hey, create an index pattern for rotten_potatoes_logs* right now."
+The Code to Add (Copy-Paste this for your teammate)
+
+They should add these tasks to playbook-2.yml right after the "Update Kubernetes Deployment" section.
+YAML
+
+    # ... (Previous tasks apply k8s-backend, k8s-database, etc.) ...
+
+    - name: 5. DEPLOY LOGGING INFRASTRUCTURE
+      ansible.builtin.shell: |
+        kubectl --kubeconfig={{ kubeconfig_path }} apply -f k8s-logging.yaml
+        # Wait for Kibana to actually start (it takes time!)
+        kubectl --kubeconfig={{ kubeconfig_path }} rollout status deployment/kibana --timeout=300s
+      args:
+        chdir: /home/{{ ansible_user }}/project_workspace
+
+    - name: 6. CONFIGURE KIBANA (The Magic Step)
+      # This task hits the Kibana API to create the index pattern automatically.
+      # It replaces the manual "Stack Management > Create Index Pattern" clicks.
+      ansible.builtin.uri:
+        url: "http://localhost:30002/api/saved_objects/index-pattern/rotten_potatoes_pattern"
+        method: POST
+        headers:
+          kbn-xsrf: "true" # Required by Kibana to prove this isn't a hacker attack
+          Content-Type: "application/json"
+        body_format: json
+        body:
+          attributes:
+            title: "rotten_potatoes_logs*"
+            timeFieldName: "timestamp"
+        status_code: [200, 409] # 200 = Created, 409 = Already exists (don't fail if run twice)
+      register: kibana_response
+      retries: 10      # If Kibana isn't ready yet...
+      delay: 10        # ...wait 10 seconds and try again (up to 100s total)
+      until: kibana_response.status == 200 or kibana_response.status == 409
+
+Breakdown of what this does:
+
+    Deploy & Wait:
+
+        It applies the k8s-logging.yaml file.
+
+        Crucial: It runs rollout status. This pauses the Ansible script until Kibana is 100% running. If we tried to configure it while it was booting, it would fail.
+
+    The API Call (ansible.builtin.uri):
+
+        URL: It talks to localhost:30002 (where Kibana lives).
+
+        Endpoint: /api/saved_objects/index-pattern/... is the specific door for creating patterns.
+
+        kbn-xsrf: true: This is a special header Kibana requires for security. Without it, the API ignores you.
+
+        Body: It sends the exact configuration you typed manually (title: "rotten_potatoes_logs*", timeFieldName: "timestamp").
+
+    Robustness (retries):
+
+        Even after the pod starts, Kibana takes about 1 minute to "warm up" its internal database.
+
+        The retries: 10 loop ensures that if Ansible tries too early and gets a "Connection Refused," it will just wait and try again until it works.
+
+The Result
+
+When this playbook runs:
+
+    Kubernetes starts the ELK stack.
+
+    Ansible waits for it to turn green.
+
+    Ansible configures the Index Pattern.
+
+    You open the browser, and the logs are already there. No manual setup required.
