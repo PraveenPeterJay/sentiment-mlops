@@ -107,6 +107,8 @@
         kubectl --kubeconfig={{ kubeconfig_path }} apply -f k8s-backend.yaml
         kubectl --kubeconfig={{ kubeconfig_path }} apply -f k8s-frontend.yaml
 
+        kubectl --kubeconfig={{ kubeconfig_path }} apply -f k8s-ingress.yaml
+
         kubectl --kubeconfig={{ kubeconfig_path }} rollout restart deployment/backend-deployment
         kubectl --kubeconfig={{ kubeconfig_path }} rollout restart deployment/frontend-deployment
       become: yes
@@ -120,7 +122,7 @@
 
     - name: 6. CONFIGURE KIBANA 
       ansible.builtin.uri:
-        url: "http://192.168.49.2:30002/api/saved_objects/index-pattern/rotten_potatoes_pattern"
+        url: "http://kibana.com/api/saved_objects/index-pattern/rotten_potatoes_pattern"
         method: POST
         headers:
           kbn-xsrf: "true" # Required by Kibana to prove this isn't a hacker attack
