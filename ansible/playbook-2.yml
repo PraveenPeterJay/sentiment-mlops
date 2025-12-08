@@ -36,6 +36,7 @@
         dest: "/home/{{ ansible_user }}/mlflow_history/"
         mode: push
         archive: yes
+      become: yes
 
     - name: Copy Code, Config, and DVC Pointers
       ansible.builtin.synchronize:
