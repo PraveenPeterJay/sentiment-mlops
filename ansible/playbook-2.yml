@@ -47,7 +47,7 @@
         
         # DVC & Training
         dvc remote remove mylocal || true
-        dvc remote add -d -f mylocal .dvc/cache 
+        dvc cache dir /home/{{ ansible_user }}/dvc_repo_cache
         dvc pull
         
         # Handle MLflow history link (Ensure this block is indented consistently)
