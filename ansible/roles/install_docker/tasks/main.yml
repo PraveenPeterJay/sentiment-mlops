@@ -1,0 +1,24 @@
+---
+- name: Install Docker
+  ansible.builtin.apt:
+    pkg:
+      - docker.io
+    state: present
+
+- name: Ensure Docker service is running
+  ansible.builtin.systemd:
+    name: docker
+    state: started
+    enabled: yes
+
+- name: Add user to docker group
+  ansible.builtin.user:
+    name: "{{ ansible_user }}"
+    groups: docker
+    append: yes
+
+- name: Force user's new 'docker' group membership to take effect
+  ansible.builtin.shell: |
+    newgrp docker || true
+  become: false
+  changed_when: true

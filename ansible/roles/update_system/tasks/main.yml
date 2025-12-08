@@ -1,0 +1,21 @@
+---
+- name: Update all packages
+  ansible.builtin.apt:
+    update_cache: yes
+  become: yes
+  ignore_errors: yes
+
+- name: Install system dependencies
+  ansible.builtin.apt:
+    pkg:
+      - apt-transport-https
+      - ca-certificates
+      - curl
+      - gnupg
+      - lsb-release
+      - software-properties-common
+      - sudo
+      - rsync
+      - python3-venv
+    state: present
+  become: yes

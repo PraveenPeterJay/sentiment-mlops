@@ -1,0 +1,62 @@
+---
+- name: Install kubectl using snap
+  become: yes
+  community.general.snap:
+    name: kubectl
+    classic: yes
+    state: present
+
+- name: Verify kubectl installation
+  ansible.builtin.command: kubectl version --client
+  register: kubectl_out
+  changed_when: false
+
+- name: Show kubectl version
+  ansible.builtin.debug:
+    msg: "{{ kubectl_out.stdout }}"
+
+- name: Check if Minikube is already installed
+  ansible.builtin.stat:
+    path: /usr/local/bin/minikube
+  register: minikube_bin
+
+- name: Download Minikube binary if missing
+  ansible.builtin.get_url:
+    url: https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
+    dest: /usr/local/bin/minikube
+    mode: '0755'
+  when: not minikube_bin.stat.exists
+
+- name: Check Minikube status
+  become: false
+  ansible.builtin.command: minikube status --format='{{ "{{.Host}}" }}'
+  register: minikube_status
+  failed_when: false
+  changed_when: false
+
+# - name: Start Minikube if not running
+#   become: false
+#   ansible.builtin.shell: |
+#     minikube start --driver=docker --delete-on-failure --wait=all --alsologtostderr --interactive=false
+#     minikube update-context
+#   register: minikube_start
+#   failed_when: 
+#     - minikube_start.rc != 0 
+#     - "'Exiting' in minikube_start.stderr"
+#     - "'error' in minikube_start.stderr.lower()"
+    
+#   changed_when: true
+#   when: minikube_status.stdout.find("Running") == -1
+#   args:
+#     chdir: "{{ ansible_env.HOME }}"
+#     executable: /bin/bash
+
+- name: Display Minikube final status
+  become: false
+  ansible.builtin.command: minikube status
+  register: minikube_final
+  changed_when: false
+
+- name: Output Minikube status
+  ansible.builtin.debug:
+    msg: "{{ minikube_final.stdout }}"

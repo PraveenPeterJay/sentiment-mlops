@@ -1,0 +1,102 @@
+---
+- name: "MLOps CI/CD Stages on Remote Host"
+  hosts: server
+  gather_facts: no # No need for facts in this playbook
+  vars:
+    # Variables passed from the Jenkinsfile environment
+    backend_image: "{{ lookup('env', 'BACKEND_IMAGE') }}"
+    frontend_image: "{{ lookup('env', 'FRONTEND_IMAGE') }}"
+    docker_tag: "{{ lookup('env', 'DOCKER_TAG') }}"
+    dockerhub_user: "{{ lookup('env', 'DOCKERHUB_CREDENTIALS_USR') }}"
+    dockerhub_pass: "{{ lookup('env', 'DOCKERHUB_CREDENTIALS_PSW') }}"
+    kubeconfig_path: "/var/lib/jenkins/kubeconfig" # Assumes kubeconfig is copied to the host
+
+  tasks:
+    tasks:
+    - name: Ensure project directory exists
+      ansible.builtin.file:
+        path: /home/{{ ansible_user }}/project_workspace
+        state: directory
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}" # Explicitly set group for clarity
+        mode: '0755'
+      become: yes
+      
+    - name: Copy MLflow history to remote host
+      ansible.builtin.synchronize:
+        src: "/var/lib/jenkins/mlflow_history/"
+        dest: "/home/{{ ansible_user }}/mlflow_history/"
+        mode: push
+        archive: yes
+
+    - name: Copy Code, Config, and DVC Pointers
+      ansible.builtin.synchronize:
+        src: "{{ workspace }}/"
+        dest: /home/{{ ansible_user }}/project_workspace/
+        mode: push
+        archive: yes
+      args:
+        rsync_opts:
+          - "--exclude=.dvc/cache" 
+
+    - name: 1. TRAIN MODEL (CI)
+      ansible.builtin.shell: |
+        echo "Starting MLOps training steps..."
+        set -e
+        cd /home/{{ ansible_user }}/project_workspace
+        
+        # Setup Venv
+        python3 -m venv venv
+        . venv/bin/activate
+        pip install --upgrade pip
+        pip install -r requirements.txt
+
+        # DVC: Uses the shared, permanent archive
+        dvc remote remove mylocal || true # Clean up old reference
+        dvc remote add -d -f jenkins_local_archive /var/jenkins_dvc_storage
+        dvc pull
+        
+        # Handle MLflow history link (Ensure path is consistent)
+        ln -s /home/{{ ansible_user }}/mlflow_history mlruns
+        python3 train.py
+        rm mlruns
+        cp -r /home/{{ ansible_user }}/mlflow_history mlruns
+      args:
+        chdir: /home/{{ ansible_user }}/project_workspace
+        timeout: 1800 # 30-minute timeout for training
+
+    # (Tasks 2, 3, and 4 are fine)
+
+    - name: 2. BUILD DOCKER IMAGES
+      ansible.builtin.shell: |
+        set -e
+        cd /home/{{ ansible_user }}/project_workspace
+        docker build -f Dockerfile.backend -t {{ backend_image }}:{{ docker_tag }} .
+        docker build -f Dockerfile.frontend -t {{ frontend_image }}:{{ docker_tag }} .
+      args:
+        chdir: /home/{{ ansible_user }}/project_workspace
+
+    - name: 3. PUSH TO DOCKER HUB
+      ansible.builtin.shell: |
+        set -e
+        cd /home/{{ ansible_user }}/project_workspace
+        echo "{{ dockerhub_pass }}" | docker login -u "{{ dockerhub_user }}" --password-stdin
+        docker push {{ backend_image }}:{{ docker_tag }}
+        docker push {{ frontend_image }}:{{ docker_tag }}
+        docker logout
+
+    - name: 4. UPDATE KUBERNETES DEPLOYMENT
+      ansible.builtin.shell: |
+        set -e
+        cd /home/{{ ansible_user }}/project_workspace
+        
+        # Apply YAMLs
+        kubectl --kubeconfig={{ kubeconfig_path }} apply -f k8s-backend.yaml
+        kubectl --kubeconfig={{ kubeconfig_path }} apply -f k8s-database.yaml
+        kubectl --kubeconfig={{ kubeconfig_path }} apply -f k8s-frontend.yaml
+        
+        # Restart Deployments
+        kubectl --kubeconfig={{ kubeconfig_path }} rollout restart deployment/backend-deployment
+        kubectl --kubeconfig={{ kubeconfig_path }} rollout restart deployment/frontend-deployment
+      args:
+        chdir: /home/{{ ansible_user }}/project_workspace

@@ -14,18 +14,29 @@ spec:
     spec:
       containers:
       - name: backend
-        # IMPORTANT: Since we haven't pushed images to Docker Hub, 
-        # we will tell K8s to look for the image on your laptop locally.
-        image: aayushbhargav57/mlops-backend:latest
+        image: praveenpeterjay2/mlops-backend:latest
         imagePullPolicy: Always
         ports:
         - containerPort: 8000
-        # No Volume Mounts Here Anymore
+        resources:
+          requests:
+            cpu: "100m"
+          limits:
+            cpu: "200m"
+        env:
+        - name: DB_HOST
+          value: "postgres-service" 
+        - name: POSTGRES_USER
+          value: "user"
+        - name: POSTGRES_PASSWORD
+          value: "password"
+        - name: POSTGRES_DB
+          value: "rotten_potatoes_db"
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: backend # This is the DNS name the frontend will use
+  name: backend
 spec:
   selector:
     app: backend
@@ -33,4 +44,25 @@ spec:
     - protocol: TCP
       port: 8000
       targetPort: 8000
-  type: ClusterIP # Internal only. The frontend is inside the cluster, so this is fine.
+  type: ClusterIP
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: backend-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: backend-deployment 
+  
+  minReplicas: 1
+  maxReplicas: 5 
+  
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 5

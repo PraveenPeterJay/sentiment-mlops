@@ -1,4 +1,6 @@
 [core]
     remote = mylocal
+['remote "jenkins_local_archive"']
+    url = /var/jenkins_dvc_storage
 ['remote "mylocal"']
     url = /tmp/dvc_store
