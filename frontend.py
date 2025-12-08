@@ -154,8 +154,7 @@ if selected_movie:
                 unsafe_allow_html=True
             )
 
-            if i < len(recent_reviews) - 1:
-                st.markdown("---")
+            st.markdown("---")
 
     else:
         st.info("Be the first to review this movie!")

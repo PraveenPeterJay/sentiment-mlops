@@ -9,7 +9,7 @@
     docker_tag: "{{ lookup('env', 'DOCKER_TAG') }}"
     dockerhub_user: "{{ lookup('env', 'DOCKER_USR') }}"
     dockerhub_pass: "{{ lookup('env', 'DOCKER_PSW') }}"
-    kubeconfig_path: "/var/lib/jenkins/.kube/config" 
+    kubeconfig_path: "/home/iiitb/.kube/config" 
 
   tasks:
     - name: Ensure project directory exists
@@ -73,25 +73,25 @@
         chdir: /home/{{ ansible_user }}/project_workspace
       become: yes
 
-    # - name: 2. BUILD DOCKER IMAGES
-    #   ansible.builtin.shell: |
-    #     set -e
-    #     cd /home/{{ ansible_user }}/project_workspace
-    #     docker build -f Dockerfile.backend -t {{ backend_image }}:{{ docker_tag }} .
-    #     docker build -f Dockerfile.frontend -t {{ frontend_image }}:{{ docker_tag }} .
-    #   args:
-    #     chdir: /home/{{ ansible_user }}/project_workspace
-    #   become: yes
+    - name: 2. BUILD DOCKER IMAGES
+      ansible.builtin.shell: |
+        set -e
+        cd /home/{{ ansible_user }}/project_workspace
+        docker build -f Dockerfile.backend -t {{ backend_image }}:{{ docker_tag }} .
+        docker build -f Dockerfile.frontend -t {{ frontend_image }}:{{ docker_tag }} .
+      args:
+        chdir: /home/{{ ansible_user }}/project_workspace
+      become: yes
 
-    # - name: 3. PUSH TO DOCKER HUB
-    #   ansible.builtin.shell: |
-    #     set -e
-    #     cd /home/{{ ansible_user }}/project_workspace
-    #     echo "{{ dockerhub_pass }}" | docker login -u "{{ dockerhub_user }}" --password-stdin
-    #     docker push {{ backend_image }}:{{ docker_tag }}
-    #     docker push {{ frontend_image }}:{{ docker_tag }}
-    #     docker logout
-    #   become: yes
+    - name: 3. PUSH TO DOCKER HUB
+      ansible.builtin.shell: |
+        set -e
+        cd /home/{{ ansible_user }}/project_workspace
+        echo "{{ dockerhub_pass }}" | docker login -u "{{ dockerhub_user }}" --password-stdin
+        docker push {{ backend_image }}:{{ docker_tag }}
+        docker push {{ frontend_image }}:{{ docker_tag }}
+        docker logout
+      become: yes
 
     # Your existing shell task for deployments remains the same
     - name: 4. UPDATE KUBERNETES DEPLOYMENT
