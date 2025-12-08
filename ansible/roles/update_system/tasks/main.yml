@@ -15,5 +15,6 @@
       - software-properties-common
       - sudo
       - rsync
+      - pip
       - python3-venv
     state: present

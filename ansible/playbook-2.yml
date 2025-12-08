@@ -33,6 +33,13 @@
         mode: push
         archive: yes
 
+    - name: Copy DVC cache to remote
+      ansible.builtin.synchronize:
+        src: "/var/jenkins_dvc_storage/"
+        dest: "/var/jenkins_dvc_storage/"
+        mode: push
+        archive: yes
+
     - name: 1. TRAIN MODEL (CI)
       ansible.builtin.shell: |
         echo "Starting MLOps training steps..." # <-- Added simple command
@@ -45,10 +52,8 @@
         pip install --upgrade pip
         pip install -r requirements.txt
 
-        # dvc remote remove mylocal || true
-        # dvc remote remove jenkins_local_archive || true
-        # dvc remote add -d -f jenkins_local_archive /var/jenkins_dvc_storage
-        # dvc pull
+        dvc remote add -d -f jenkins_local_archive /var/jenkins_dvc_storage
+        dvc pull
         
         # Handle MLflow history link (Ensure this block is indented consistently)
         ln -s /home/{{ ansible_user }}/mlflow_history mlruns
