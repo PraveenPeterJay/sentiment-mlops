@@ -12,7 +12,8 @@ from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.exc import OperationalError
 import logging
-from cmreslogging.handlers import CMRESHandler # Import the Elasticsearch Handler
+import requests     # Make sure requests is imported
+import datetime     # Import datetime for timestamps
 
 # --- CONFIGURATION ---
 # Database connection string uses the Kubernetes Service Name: 'postgres-service'
@@ -22,6 +23,31 @@ DB_PASSWORD = os.getenv("POSTGRES_PASSWORD", "password")
 DB_NAME = os.getenv("POSTGRES_DB", "rotten_potatoes_db")
 SQLALCHEMY_DATABASE_URL = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:5432/{DB_NAME}"
 
+
+# --- CUSTOM LOG HANDLER (The Fix) ---
+# Since cmreslogging is broken on Python 3.12, we write our own simple handler.
+class SimpleElasticsearchHandler(logging.Handler):
+    def __init__(self, host, port, index):
+        super().__init__()
+        self.url = f"http://{host}:{port}/{index}/_doc"
+        self.headers = {"Content-Type": "application/json"}
+
+    def emit(self, record):
+        try:
+            # Create a simple JSON payload
+            payload = {
+                "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                "level": record.levelname,
+                "message": self.format(record),
+                "logger": record.name,
+                "path": record.pathname,
+                "line": record.lineno
+            }
+            # Send to Elasticsearch (fire and forget, 1s timeout)
+            requests.post(self.url, headers=self.headers, json=payload, timeout=1)
+        except Exception:
+            # If Logging fails (e.g. ES is down), don't crash the app!
+            pass
 # --- LOGGING SETUP (ELK) ---
 # We configure the logger to send data to the 'elasticsearch' K8s service
 log = logging.getLogger("rotten_potatoes_logger")
@@ -31,16 +57,14 @@ log.setLevel(logging.INFO)
 console_handler = logging.StreamHandler()
 log.addHandler(console_handler)
 
-# 2. Elasticsearch Handler (Sends logs to Kibana)
+# 2. Elasticsearch Handler (Using our new Custom Class)
 try:
-    es_handler = CMRESHandler(
-        hosts=[{'host': 'elasticsearch', 'port': 9200}],
-        auth_type=CMRESHandler.AuthType.NO_AUTH,
-        es_index_name="rotten_potatoes_logs"
-    )
+    # We point to 'elasticsearch' service on port 9200
+    es_handler = SimpleElasticsearchHandler(host='elasticsearch', port=9200, index='rotten_potatoes_logs')
     log.addHandler(es_handler)
 except Exception as e:
-    log.info(f"WARNING: Could not connect to Elasticsearch. Logs will only print to console. Error: {e}")
+    print(f"WARNING: Could not initialize Elasticsearch logging. Error: {e}")
+
 
 # --- DATABASE SETUP (SQLAlchemy) ---
 engine = create_engine(SQLALCHEMY_DATABASE_URL)
