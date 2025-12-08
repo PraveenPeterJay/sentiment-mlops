@@ -34,22 +34,22 @@
   failed_when: false
   changed_when: false
 
-- name: Start Minikube if not running
-  become: false
-  ansible.builtin.shell: |
-    minikube start --driver=docker --delete-on-failure --wait=all --alsologtostderr --interactive=false
-    minikube update-context
-  register: minikube_start
-  failed_when: 
-    - minikube_start.rc != 0 
-    - "'Exiting' in minikube_start.stderr"
-    - "'error' in minikube_start.stderr.lower()"
+# - name: Start Minikube if not running
+#   become: false
+#   ansible.builtin.shell: |
+#     minikube start --driver=docker --delete-on-failure --wait=all --alsologtostderr --interactive=false
+#     minikube update-context
+#   register: minikube_start
+#   failed_when: 
+#     - minikube_start.rc != 0 
+#     - "'Exiting' in minikube_start.stderr"
+#     - "'error' in minikube_start.stderr.lower()"
     
-  changed_when: true
-  when: minikube_status.stdout.find("Running") == -1
-  args:
-    chdir: "{{ ansible_env.HOME }}"
-    executable: /bin/bash
+#   changed_when: true
+#   when: minikube_status.stdout.find("Running") == -1
+#   args:
+#     chdir: "{{ ansible_env.HOME }}"
+#     executable: /bin/bash
 
 - name: Display Minikube final status
   become: false
