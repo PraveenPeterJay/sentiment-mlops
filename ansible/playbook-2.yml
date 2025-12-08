@@ -20,6 +20,15 @@
         group: "{{ ansible_user }}" # Explicitly set group for clarity
         mode: '0755'
       become: yes
+
+    - name: Ensure MLflow history directory exists and is owned by user
+      ansible.builtin.file:
+        path: /home/{{ ansible_user }}/mlflow_history
+        state: directory
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0755'
+      become: yes
       
     - name: Copy MLflow history to remote host
       ansible.builtin.synchronize:
