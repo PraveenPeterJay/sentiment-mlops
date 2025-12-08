@@ -67,7 +67,7 @@ class MovieReviewData(BaseModel):
     review_id: int
     movie_id: int
     review: str
-    isPos: Boolean
+    isPos: bool
 
 class ReviewInput(BaseModel):
     """Schema for the new /submit_review endpoint."""
