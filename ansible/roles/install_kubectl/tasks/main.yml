@@ -37,25 +37,19 @@
 - name: Start Minikube if not running
   become: false
   ansible.builtin.shell: |
-    export PATH=$PATH:/usr/local/bin:/usr/bin:/bin
-    
-    export KUBECONFIG={{ ansible_env.HOME }}/.kube/config
-    
-    minikube start --driver=docker --delete-on-failure --wait=all --alsologtostderr --interactive=false
-    
+    # ... (shell commands) ...
     minikube update-context
   register: minikube_start
-  args:
-    chdir: "{{ ansible_env.HOME }}"
-    executable: /bin/bash
-    timeout: 60 # 1 minute
-  failed_when: 
+  failed_when:
     - "'Exiting' in minikube_start.stdout"
     - "'Exiting' in minikube_start.stderr"
     - "'error' in minikube_start.stderr.lower()"
   changed_when: true
   when: minikube_status.stdout != "Running" and minikube_status.stdout != "Running\n"
-  ignore_errors: yes
+  args:
+    chdir: "{{ ansible_env.HOME }}"
+    executable: /bin/bash
+    timeout: 60
 
 - name: Display Minikube final status
   become: false
