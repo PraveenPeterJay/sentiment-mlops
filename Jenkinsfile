@@ -102,14 +102,15 @@ pipeline {
         stage('Update Kubernetes') {
             steps {
                 echo 'Applying new K8s Config...'
+
                 // 1. Apply the YAML files (Updates config like removing volumes)
-                sh "kubectl --kubeconfig=/var/lib/jenkins/kubeconfig apply -f k8s-backend.yaml"
-                sh "kubectl --kubeconfig=/var/lib/jenkins/kubeconfig apply -f k8s-database.yaml"
-                sh "kubectl --kubeconfig=/var/lib/jenkins/kubeconfig apply -f k8s-frontend.yaml"
-                
+                sh "kubectl --kubeconfig=/var/lib/jenkins/kubeconfig apply -f k8s-backend.yaml --insecure-skip-tls-verify"
+                sh "kubectl --kubeconfig=/var/lib/jenkins/kubeconfig apply -f k8s-database.yaml --insecure-skip-tls-verify"
+                sh "kubectl --kubeconfig=/var/lib/jenkins/kubeconfig apply -f k8s-frontend.yaml --insecure-skip-tls-verify"
+
                 // 2. Restart to pick up new images
-                sh "kubectl --kubeconfig=/var/lib/jenkins/kubeconfig rollout restart deployment/backend-deployment"
-                sh "kubectl --kubeconfig=/var/lib/jenkins/kubeconfig rollout restart deployment/frontend-deployment"
+                sh "kubectl --kubeconfig=/var/lib/jenkins/kubeconfig rollout restart deployment/backend-deployment --insecure-skip-tls-verify"
+                sh "kubectl --kubeconfig=/var/lib/jenkins/kubeconfig rollout restart deployment/frontend-deployment --insecure-skip-tls-verify"
             }
         }
     }
