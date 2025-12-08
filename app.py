@@ -276,9 +276,9 @@ def submit_and_predict_review(review_input: ReviewInput, db: Session = Depends(g
 @app.get("/reviews/{movie_id}", response_model=List[MovieReviewData])
 def get_reviews(movie_id: int, db: Session = Depends(get_db)):
     recent_reviews = (
-        db.query(Review)
-          .filter(Review.movie_id == movie_id)
-          .order_by(Review.review_id.desc())
+        db.query(MovieReview)
+          .filter(MovieReview.movie_id == movie_id)
+          .order_by(MovieReview.review_id.desc())
           .limit(3)
           .all()
     )
