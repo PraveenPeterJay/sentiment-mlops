@@ -11,6 +11,8 @@ from sqlalchemy import create_engine, Column, Integer, String, Boolean, Float
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.exc import OperationalError
+import logging
+from cmreslogging.handlers import CMRESHandler # Import the Elasticsearch Handler
 
 # --- CONFIGURATION ---
 # Database connection string uses the Kubernetes Service Name: 'postgres-service'
@@ -19,6 +21,26 @@ DB_USER = os.getenv("POSTGRES_USER", "user")
 DB_PASSWORD = os.getenv("POSTGRES_PASSWORD", "password")
 DB_NAME = os.getenv("POSTGRES_DB", "rotten_potatoes_db")
 SQLALCHEMY_DATABASE_URL = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:5432/{DB_NAME}"
+
+# --- LOGGING SETUP (ELK) ---
+# We configure the logger to send data to the 'elasticsearch' K8s service
+log = logging.getLogger("rotten_potatoes_logger")
+log.setLevel(logging.INFO)
+
+# 1. Console Handler (So you can still see logs in 'kubectl logs')
+console_handler = logging.StreamHandler()
+log.addHandler(console_handler)
+
+# 2. Elasticsearch Handler (Sends logs to Kibana)
+try:
+    es_handler = CMRESHandler(
+        hosts=[{'host': 'elasticsearch', 'port': 9200}],
+        auth_type=CMRESHandler.AuthType.NO_AUTH,
+        es_index_name="rotten_potatoes_logs"
+    )
+    log.addHandler(es_handler)
+except Exception as e:
+    log.info(f"WARNING: Could not connect to Elasticsearch. Logs will only print to console. Error: {e}")
 
 # --- DATABASE SETUP (SQLAlchemy) ---
 engine = create_engine(SQLALCHEMY_DATABASE_URL)
@@ -85,7 +107,7 @@ class ScoreResponse(BaseModel):
 app = FastAPI(title="Rotten Potatoes Backend API", 
               description="FastAPI, MLflow, and Persistent DB Integration.")
 
-print("Loading model...")
+log.info("Loading model...")
 model = None
 latest_run_id = "Unknown"
 
@@ -98,7 +120,7 @@ try:
     for root, dirs, files in os.walk(search_path):
         if "model.pkl" in files:
             model_uri = root
-            print(f"Found model.pkl at: {model_uri}")
+            log.info(f"Found model.pkl at: {model_uri}")
             break
             
     if not model_uri:
@@ -107,14 +129,14 @@ try:
 
     # Load the model from the folder we found
     model = mlflow.sklearn.load_model(model_uri)
-    print("Model loaded successfully!")
+    log.info("Model loaded successfully!")
     
     # Use the folder name as the version ID for display
     # This assumes a structure like mlruns/X/Y/artifacts/model
     latest_run_id = os.path.basename(os.path.dirname(os.path.dirname(model_uri)))
 
 except Exception as e:
-    logging.error(f"CRITICAL ERROR: Could not load model. {e}")
+    log.error(f"CRITICAL ERROR: Could not load model. {e}")
     model = None
 
 # --- DATABASE SEEDING FUNCTION ---
@@ -128,10 +150,10 @@ def seed_database(db: Session):
 
     # 2. Check if the 'movies' table is already populated
     if db.query(Movie).count() > 0:
-        print("Database already seeded. Skipping initial data load.")
+        log.info("Database already seeded. Skipping initial data load.")
         return
 
-    print("Database is empty. Populating with initial data...")
+    log.info("Database is empty. Populating with initial data...")
 
     try:
         with open("initial_movies.json", "r") as f:
@@ -140,10 +162,10 @@ def seed_database(db: Session):
         with open("initial_reviews.json", "r") as f:
             initial_reviews_data = json.load(f)
     except FileNotFoundError as e:
-        print(f"CRITICAL ERROR: Data file not found. {e}")
+        log.info(f"CRITICAL ERROR: Data file not found. {e}")
         return # Stop seeding if files are missing
     except json.JSONDecodeError as e:
-        print(f"CRITICAL ERROR: Data file has invalid JSON format. {e}")
+        log.info(f"CRITICAL ERROR: Data file has invalid JSON format. {e}")
         return # Stop seeding if JSON is invalid
 
     # 3. Insert Movies
@@ -167,11 +189,11 @@ def seed_database(db: Session):
                 isPos=is_positive
             ))
         else:
-            print(f"Warning: Review for movie '{name}' skipped (Movie ID not found).")
+            log.info(f"Warning: Review for movie '{name}' skipped (Movie ID not found).")
             
     db.add_all(review_objects)
     db.commit()
-    print(f"Database seeding complete. Inserted {len(movie_objects)} movies and {len(review_objects)} reviews.")
+    log.info(f"Database seeding complete. Inserted {len(movie_objects)} movies and {len(review_objects)} reviews.")
 
 # --- LIFECYCLE HOOK: SEED DATABASE ON STARTUP ---
 
@@ -183,9 +205,9 @@ async def startup_event():
         seed_database(db)
     except OperationalError as e:
         # This will catch errors if the Postgres container is not yet ready
-        print(f"WARNING: Could not connect to database on startup. Retrying connection later. Error: {e}")
+        log.info(f"WARNING: Could not connect to database on startup. Retrying connection later. Error: {e}")
     except Exception as e:
-        print(f"FATAL ERROR during startup/seeding: {e}")
+        log.info(f"FATAL ERROR during startup/seeding: {e}")
     finally:
         if 'db' in locals() and db:
             db.close()
@@ -248,7 +270,7 @@ def submit_and_predict_review(review_input: ReviewInput, db: Session = Depends(g
         # isPos is True if sentiment is 'Positive', False otherwise
         is_positive = sentiment.lower() == "positive"
     except Exception as e:
-        logging.error(f"Prediction failed: {e}")
+        log.error(f"Prediction failed: {e}")
         raise HTTPException(status_code=500, detail="Prediction service failed.")
 
     # --- Step 2: Save Review to Database ---
@@ -263,7 +285,7 @@ def submit_and_predict_review(review_input: ReviewInput, db: Session = Depends(g
         db.refresh(new_review)
     except Exception as e:
         db.rollback()
-        logging.error(f"Database insertion failed: {e}")
+        log.error(f"Database insertion failed: {e}")
         # Note: We still return the prediction even if the save fails, but log the error
         raise HTTPException(status_code=500, detail="Review saved failed but prediction was successful.")
 
