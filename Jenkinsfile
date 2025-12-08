@@ -31,11 +31,14 @@ pipeline {
             steps {
                 echo 'Running Configuration Management playbook (install Docker/K8s tools)...'
                 sh """
-                    ansible-playbook -i ansible/inventory.ini ansible/playbook-1.yml \\
-                    --vault-password-file=<(echo \$ANSIBLE_VAULT_PASSWORD) \\
-                    --extra-vars 'workspace=${WORKSPACE}'
+                    echo "\$ANSIBLE_VAULT_PASSWORD" > vault-pass.txt
+
+                    ansible-playbook -i ansible/inventory.ini ansible/playbook-1.yml \
+                        --vault-password-file=vault-pass.txt \
+                        --extra-vars 'workspace=${WORKSPACE}'
+
+                    rm vault-pass.txt
                 """
-                echo 'Remote host configured and ready for deployment.'
             }
         }
 
@@ -46,9 +49,13 @@ pipeline {
                                                 usernameVariable: 'DOCKER_USR', 
                                                 passwordVariable: 'DOCKER_PSW')]) {
                     sh """
-                        ansible-playbook -i ansible/inventory.ini ansible/playbook-2.yml \\
-                        --vault-password-file=<(echo \$ANSIBLE_VAULT_PASSWORD) \\
+                        echo "\$ANSIBLE_VAULT_PASSWORD" > vault-pass.txt
+
+                        ansible-playbook -i ansible/inventory.ini ansible/playbook-2.yml \
+                        --vault-password-file=vault-pass.txt \
                         --extra-vars 'workspace=${WORKSPACE} DOCKER_USR=${DOCKER_USR} DOCKER_PSW=${DOCKER_PSW}'
+
+                        rm vault-pass.txt
                     """
                 }
             }
