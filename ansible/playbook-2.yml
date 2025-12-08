@@ -26,6 +26,7 @@
         dest: "/home/{{ ansible_user }}/mlflow_history/"
         mode: push
         archive: yes
+      become: yes
 
     - name: Copy Code, Config, and DVC Pointers
       ansible.builtin.synchronize:
@@ -33,6 +34,7 @@
         dest: /home/{{ ansible_user }}/project_workspace/
         mode: push
         archive: yes
+      become: yes
 
     - name: Copy DVC cache to remote
       ansible.builtin.synchronize:
@@ -40,6 +42,7 @@
         dest: "/var/jenkins_dvc_storage/"
         mode: push
         archive: yes
+      become: yes
 
     - name: 1. TRAIN MODEL (CI)
       ansible.builtin.shell: |
