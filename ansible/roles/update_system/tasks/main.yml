@@ -2,6 +2,7 @@
 - name: Update all packages
   ansible.builtin.apt:
     update_cache: yes
+  become: yes
   ignore_errors: yes
 
 - name: Install system dependencies
@@ -17,3 +18,4 @@
       - rsync
       - python3-venv
     state: present
+  become: yes
