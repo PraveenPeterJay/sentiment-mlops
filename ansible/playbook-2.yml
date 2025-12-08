@@ -12,11 +12,13 @@
     kubeconfig_path: "/var/lib/jenkins/kubeconfig" # Assumes kubeconfig is copied to the host
 
   tasks:
+    tasks:
     - name: Ensure project directory exists
       ansible.builtin.file:
         path: /home/{{ ansible_user }}/project_workspace
         state: directory
         owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}" # Explicitly set group for clarity
         mode: '0755'
       become: yes
       
@@ -26,7 +28,6 @@
         dest: "/home/{{ ansible_user }}/mlflow_history/"
         mode: push
         archive: yes
-      become: yes
 
     - name: Copy Code, Config, and DVC Pointers
       ansible.builtin.synchronize:
@@ -34,20 +35,14 @@
         dest: /home/{{ ansible_user }}/project_workspace/
         mode: push
         archive: yes
-      become: yes
-
-    - name: Copy DVC cache to remote
-      ansible.builtin.synchronize:
-        src: "/var/jenkins_dvc_storage/"
-        dest: "/var/jenkins_dvc_storage/"
-        mode: push
-        archive: yes
-      become: yes
+      args:
+        rsync_opts:
+          - "--exclude=.dvc/cache" 
 
     - name: 1. TRAIN MODEL (CI)
       ansible.builtin.shell: |
-        echo "Starting MLOps training steps..." # <-- Added simple command
-        set -e # Exit immediately if a command fails
+        echo "Starting MLOps training steps..."
+        set -e
         cd /home/{{ ansible_user }}/project_workspace
         
         # Setup Venv
@@ -56,16 +51,21 @@
         pip install --upgrade pip
         pip install -r requirements.txt
 
+        # DVC: Uses the shared, permanent archive
+        dvc remote remove mylocal || true # Clean up old reference
         dvc remote add -d -f jenkins_local_archive /var/jenkins_dvc_storage
         dvc pull
         
-        # Handle MLflow history link (Ensure this block is indented consistently)
+        # Handle MLflow history link (Ensure path is consistent)
         ln -s /home/{{ ansible_user }}/mlflow_history mlruns
         python3 train.py
         rm mlruns
         cp -r /home/{{ ansible_user }}/mlflow_history mlruns
       args:
         chdir: /home/{{ ansible_user }}/project_workspace
+        timeout: 1800 # 30-minute timeout for training
+
+    # (Tasks 2, 3, and 4 are fine)
 
     - name: 2. BUILD DOCKER IMAGES
       ansible.builtin.shell: |
