@@ -153,6 +153,7 @@
         cd /home/{{ ansible_user }}/project_workspace
         docker build -f docker/Dockerfile.backend -t {{ backend_image }}:{{ docker_tag }} .
         docker build -f docker/Dockerfile.frontend -t {{ frontend_image }}:{{ docker_tag }} .
+      become_user: "{{ ansible_user }}"
       become: yes
 
     - name: 3. PUSH TO DOCKER HUB
