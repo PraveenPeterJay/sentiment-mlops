@@ -104,7 +104,6 @@
         chdir: /home/{{ ansible_user }}/project_workspace/kubernetes
       become: yes
 
-
     # Main sequence of tasks
     - name: 1. TRAIN MODEL 
       ansible.builtin.shell: |
@@ -137,7 +136,7 @@
         docker build -f Dockerfile.backend -t {{ backend_image }}:{{ docker_tag }} .
         docker build -f Dockerfile.frontend -t {{ frontend_image }}:{{ docker_tag }} .
       args:
-        chdir: /home/{{ ansible_user }}/project_workspace
+        chdir: /home/{{ ansible_user }}/project_workspace/docker
       become: yes
 
     - name: 3. PUSH TO DOCKER HUB

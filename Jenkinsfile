@@ -142,14 +142,14 @@ pipeline {
                  body: "SUCCESS: MLOps Pipeline (Build ${BUILD_NUMBER}) deployed new AI models to Docker Hub.",
                  from: 'jenkins@localhost',
                  subject: "Pipeline SUCCESS: MLOps Project Build #${BUILD_NUMBER}",
-                 to: "${EMAIL_ID}"
+                 to: '${EMAIL_ID}'
         }
         failure {
             mail bcc: '',
                  body: "FAILURE: MLOps Pipeline (Build ${BUILD_NUMBER}) crashed. Check logs.",
                  from: 'jenkins@localhost',
                  subject: "Pipeline FAILURE: MLOps Project Build #${BUILD_NUMBER}",
-                 to: "${EMAIL_ID}"
+                 to: '${EMAIL_ID}'
         }
         always {
             cleanWs()

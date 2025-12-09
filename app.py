@@ -150,9 +150,9 @@ def seed_database(db: Session):
 
     log.info("Database Check: Empty. Starting seeding process...")
     try:
-        with open("initial_movies.json", "r") as f:
+        with open("data/initial_movies.json", "r") as f:
             initial_movies = json.load(f)
-        with open("initial_reviews.json", "r") as f:
+        with open("data/initial_reviews.json", "r") as f:
             initial_reviews_data = json.load(f)
     except Exception as e:
         log.error(f"Seeding Failed: Could not read JSON files. {e}")
