@@ -18,12 +18,13 @@
   tasks:
     # Tasks related to directory management
     - name: Ensure project directory exists
-      ansible.builtin.shell: |
-        mkdir -p /home/{{ ansible_user }}/project_workspace
-        sudo chown -R {{ ansible_user }}:{{ ansible_user }} /home/{{ ansible_user }}/project_workspace
+      ansible.builtin.file:
+        path: /home/{{ ansible_user }}/project_workspace
+        state: directory
+        owner: iiitb
+        group: iiitb
+        recurse: yes
       become: yes
-      args:
-        creates: /home/{{ ansible_user }}/project_workspace
       
     - name: Copy MLflow history to remote host
       ansible.builtin.synchronize:
