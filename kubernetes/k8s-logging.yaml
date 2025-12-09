@@ -1,23 +1,27 @@
+# ===============================================
+# 1. PERSISTENT VOLUME CLAIM (PVC) for Elasticsearch Data
+# ===============================================
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: elasticsearch-data-pvc
-  namespace: rottenpotatoes  # Match your k8s_namespace
+  labels:
+    app: elasticsearch
 spec:
   accessModes:
-    - ReadWriteOnce
+    - ReadWriteOnce # Only one node can mount this volume read-write
   resources:
     requests:
-      storage: 2Gi  # Adjust size based on your log volume
-  storageClassName: standard  # Default for Minikube; use 'gp2' for EKS, etc
+      storage: 5Gi # Request 5 GB of persistent storage
 ---
+# ===============================================
+# 2. ELASTICSEARCH DEPLOYMENT (with Persistence)
+# ===============================================
 apiVersion: apps/v1
-kind: StatefulSet
+kind: Deployment
 metadata:
   name: elasticsearch
-  namespace: rottenpotatoes  # Add this for explicit namespace
 spec:
-  serviceName: elasticsearch  # Required for StatefulSet
   replicas: 1
   selector:
     matchLabels:
@@ -27,47 +31,67 @@ spec:
       labels:
         app: elasticsearch
     spec:
+      # --- Init Container to Fix Permissions ---
+      # Elasticsearch runs as UID 1000. This ensures the mounted volume 
+      # is correctly owned by that user before the main container starts.
+      initContainers:
+      - name: fix-permissions
+        image: busybox:1.36
+        command: ["sh", "-c", "chown -R 1000:1000 /usr/share/elasticsearch/data"]
+        securityContext:
+          runAsUser: 0 # Must run as root to change ownership
+        volumeMounts:
+        - name: elasticsearch-persistent-storage
+          mountPath: /usr/share/elasticsearch/data
+          
+      # --- Main Container Definition ---
       containers:
-        - name: elasticsearch
-          image: docker.elastic.co/elasticsearch/elasticsearch:7.17.9
-          env:
-            - name: discovery.type
-              value: single-node
-            - name: ES_JAVA_OPTS
-              value: "-Xms512m -Xmx512m"  # Limit memory usage to prevent crashes
-          ports:
-            - containerPort: 9200
-          resources:
-            limits:
-              memory: "1Gi"
-            requests:
-              cpu: "100m"
-              memory: "512Mi"
-          volumeMounts:
-            - name: es-data  # Mount PVC here
-              mountPath: /usr/share/elasticsearch/data
+      - name: elasticsearch
+        image: docker.elastic.co/elasticsearch/elasticsearch:7.17.9
+        env:
+        - name: discovery.type
+          value: single-node
+        - name: ES_JAVA_OPTS
+          value: "-Xms512m -Xmx512m" 
+        ports:
+        - containerPort: 9200
+        resources:
+          limits:
+            memory: "1Gi"
+          requests:
+            cpu: "100m"
+            memory: "512Mi"
+        volumeMounts:
+        - name: elasticsearch-persistent-storage
+          mountPath: /usr/share/elasticsearch/data # Mount point for data
+
+      # --- Volume Link to PVC ---
       volumes:
-        - name: es-data
-          persistentVolumeClaim:
-            claimName: elasticsearch-data-pvc  # Reference the PVC
+      - name: elasticsearch-persistent-storage
+        persistentVolumeClaim:
+          claimName: elasticsearch-data-pvc # Link to the PVC
 ---
+# ===============================================
+# 3. ELASTICSEARCH SERVICE
+# ===============================================
 apiVersion: v1
 kind: Service
 metadata:
   name: elasticsearch
-  namespace: rottenpotatoes
 spec:
   selector:
     app: elasticsearch
   ports:
-    - port: 9200
-      targetPort: 9200
+  - port: 9200
+    targetPort: 9200
 ---
+# ===============================================
+# 4. KIBANA DEPLOYMENT
+# ===============================================
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: kibana
-  namespace: rottenpotatoes
 spec:
   replicas: 1
   selector:
@@ -79,29 +103,31 @@ spec:
         app: kibana
     spec:
       containers:
-        - name: kibana
-          image: docker.elastic.co/kibana/kibana:7.17.9
-          env:
-            - name: ELASTICSEARCH_HOSTS
-              value: "http://elasticsearch:9200"
-          ports:
-            - containerPort: 5601
-          resources:
-            limits:
-              memory: "1Gi"
-            requests:
-              cpu: "100m"
-              memory: "512Mi"
+      - name: kibana
+        image: docker.elastic.co/kibana/kibana:7.17.9
+        env:
+        - name: ELASTICSEARCH_HOSTS
+          value: "http://elasticsearch:9200" # References the Elasticsearch Service
+        ports:
+        - containerPort: 5601
+        resources:
+          limits:
+            memory: "1Gi"
+          requests:
+            cpu: "100m"
+            memory: "512Mi"
 ---
+# ===============================================
+# 5. KIBANA SERVICE
+# ===============================================
 apiVersion: v1
 kind: Service
 metadata:
   name: kibana
-  namespace: rottenpotatoes
 spec:
   selector:
     app: kibana
   ports:
-    - port: 5601
-      targetPort: 5601
+  - port: 5601
+    targetPort: 5601
   type: NodePort
