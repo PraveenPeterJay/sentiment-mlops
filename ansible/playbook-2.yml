@@ -133,7 +133,7 @@
         
         # 1. Clean up the 'mlruns' symbolic link safely (Fixes the 'Is a directory' error)
         # This prepares the directory for a clean copy of only the latest model
-        rm -f mlruns
+        unlink mlruns
         rm -rf mlruns/latest_model || true
         mkdir -p mlruns/latest_model
 
@@ -159,6 +159,7 @@
 
       args:
         chdir: /home/{{ ansible_user }}/project_workspace
+      become_user: {{ ansible_user }}
       become: yes
 
     - name: 2. BUILD DOCKER IMAGES
