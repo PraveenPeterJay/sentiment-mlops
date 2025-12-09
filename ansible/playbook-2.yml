@@ -126,6 +126,18 @@
         # Handle MLflow history link (Ensure path is consistent)
         ln -sf /home/{{ ansible_user }}/mlflow_history mlruns
         python3 train.py
+
+        # Find the LATEST 'model.pkl' file
+        LATEST_PKL=$(find /var/lib/jenkins/mlflow_history -name "model.pkl" -type f -printf "%T@ %p\n" | sort -n | tail -1 | cut -f2- -d" ")
+        
+        echo "Found latest model at: $LATEST_PKL"
+        
+        # Get the DIRECTORY that holds this file (e.g. .../artifacts)
+        ARTIFACT_DIR=$(dirname "$LATEST_PKL")
+        
+        # Copy the ENTIRE content of that directory (model.pkl + MLmodel + conda.yaml)
+        # This satisfies MLflow's requirements
+        cp -r "$ARTIFACT_DIR"/* mlruns/latest_model/
       args:
         chdir: /home/{{ ansible_user }}/project_workspace
       become: yes
