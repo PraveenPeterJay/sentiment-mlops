@@ -8,7 +8,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # 3. Copy code
-COPY . .
+COPY frontend.py .
 
 # 4. Open the door (Port 8501 is standard for Streamlit)
 EXPOSE 8501

@@ -106,7 +106,7 @@
       become: yes
 
     # Main sequence of tasks
-    - name: 1. TRAIN MODEL 
+    - name: 1. TRAIN MODEL & PREPARE FOR DEPLOYMENT
       ansible.builtin.shell: |
         echo "Starting MLOps training steps..."
         set -e
@@ -119,13 +119,44 @@
         pip install -r requirements.txt
 
         # DVC: Uses the shared, permanent archive
-        dvc remote remove mylocal || true # Clean up old reference
+        dvc remote remove mylocal || true
         dvc remote add -d -f mylocal /tmp/dvc_store
         dvc pull
         
         # Handle MLflow history link (Ensure path is consistent)
         ln -sf /home/{{ ansible_user }}/mlflow_history mlruns
+        
+        # Run Training Script (creates a new run/model in the linked mlruns)
         python3 train.py
+        
+        # --- MODEL DISCOVERY AND PREPARATION ---
+        
+        # 1. Clean up the 'mlruns' symbolic link safely (Fixes the 'Is a directory' error)
+        # This prepares the directory for a clean copy of only the latest model
+        rm -f mlruns
+        rm -rf mlruns/latest_model || true
+        mkdir -p mlruns/latest_model
+
+        # 2. Find the LATEST 'model.pkl' path based on modification time
+        LATEST_LINE=$(find /home/{{ ansible_user }}/mlflow_history -name "model.pkl" -type f -printf "%T@ %p\n" | sort -n | tail -1)
+        
+        if [ -z "$LATEST_LINE" ]; then
+            echo "ERROR: No new model.pkl found in MLflow history. Stopping deployment."
+            exit 1
+        fi
+        
+        # 3. Robustly extract the path by stripping the timestamp
+        LATEST_PKL_PATH=$(echo "$LATEST_LINE" | sed 's/[^ ]* //')
+        
+        echo "Found latest model at: $LATEST_PKL_PATH"
+        
+        # 4. Get the ARTIFACT DIRECTORY (e.g., .../artifacts)
+        ARTIFACT_DIR=$(dirname "$LATEST_PKL_PATH")
+        
+        # 5. Copy the entire artifact contents into the local 'latest_model' directory
+        # This directory now contains model.pkl, MLmodel, conda.yaml, etc., ready for Docker.
+        cp -rv "$ARTIFACT_DIR"/* mlruns/latest_model/
+
       args:
         chdir: /home/{{ ansible_user }}/project_workspace
       become: yes

@@ -11,7 +11,10 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # 5. Copy the rest of your code into the container
-COPY . .
+COPY app.py .
+COPY data/initial_movies.json
+COPY data/initial_reviews.json
+COPY mlruns/latest_model/ ./mlruns/latest_model/
 
 # 6. Open the door for traffic (Port 8000)
 EXPOSE 8000
