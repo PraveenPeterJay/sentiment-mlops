@@ -159,7 +159,7 @@
 
       args:
         chdir: /home/{{ ansible_user }}/project_workspace
-      become_user: {{ ansible_user }}
+      become_user: "{{ ansible_user }}"
       become: yes
 
     - name: 2. BUILD DOCKER IMAGES
