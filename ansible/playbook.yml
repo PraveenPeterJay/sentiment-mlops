@@ -1,5 +1,5 @@
 ---
-- name: "Provision server for MLOps deployment"
+- name: "MLOps Pipeline: Configure, Build, Train, & Deploy on Host(s)'"
   hosts: server
   gather_facts: yes
 
