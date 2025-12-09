@@ -1,3 +1,4 @@
+---
 - name: Update Kubernetes Deployment
   ansible.builtin.shell: |
     set -e

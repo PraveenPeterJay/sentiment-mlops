@@ -25,4 +25,4 @@
     - build_and_push_to_docker
     - prepare_minikube
     - deploy_on_minikube
-    - configure_kibana
+    # - configure_kibana

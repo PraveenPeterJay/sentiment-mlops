@@ -1,0 +1,323 @@
+// stage('Configure Remote Host') {
+        //     steps {
+        //         echo 'Running Configuration Management playbook (install Docker/K8s tools)...'
+
+        //         sh '''
+        //             # Write vault password WITHOUT Groovy interpolation
+        //             printf "%s" "$ANSIBLE_VAULT_PASSWORD" > vault-pass.txt
+
+        //             ansible-playbook \
+        //                 -i ansible/inventory.ini \
+        //                 ansible/playbook-1.yml \
+        //                 --vault-password-file vault-pass.txt \
+        //                 --extra-vars workspace="$WORKSPACE"
+
+        //             rm -f vault-pass.txt
+        //         '''
+        //     }
+        // }
+
+        // stage('Train Model (CI)') {
+        //     steps {
+        //         echo 'Training with Persistent History...'
+        //         sh '''
+        //         python3 -m venv venv
+        //         . venv/bin/activate
+        //         pip install --upgrade pip
+        //         pip install -r requirements.txt
+                
+        //         # 1. SETUP DVC
+        //         dvc remote add -d -f mylocal /tmp/dvc_store
+        //         dvc pull
+                
+        //         # 2. LINK TO PERMANENT HISTORY (The Trick)
+        //         # Instead of deleting mlruns, we link it to the permanent folder
+        //         # This way, Run 1, Run 2, Run 3... are all saved forever.
+        //         ln -s /var/lib/jenkins/mlflow_history mlruns
+                
+        //         # 3. TRAIN
+        //         # MLflow will now append the new run to the history
+        //         python3 train.py
+                
+        //         # 4. UNLINK (Cleanup for Docker build)
+        //         # We need to copy the *content* into the docker image, not the link
+        //         rm mlruns
+        //         cp -r /var/lib/jenkins/mlflow_history mlruns
+        //         '''
+        //     }
+        // }
+
+        // stage('Build Docker Images') {
+        //     steps {
+        //         echo 'Building Images (With Model Baked In)...'
+        //         // The Dockerfile now copies the 'mlruns' folder we just created!
+        //         sh "docker build -f Dockerfile.backend -t ${BACKEND_IMAGE}:${DOCKER_TAG} ."
+        //         sh "docker build -f Dockerfile.frontend -t ${FRONTEND_IMAGE}:${DOCKER_TAG} ."
+        //     }
+        // }
+
+        // stage('Push to Docker Hub') {
+        //     steps {
+        //         // Secure login using your existing credentials syntax
+        //         sh """
+        //         echo "${DOCKERHUB_CREDENTIALS_PSW}" | docker login -u "${DOCKERHUB_CREDENTIALS_USR}" --password-stdin
+                
+        //         # Push Backend
+        //         docker push ${BACKEND_IMAGE}:${DOCKER_TAG}
+                
+        //         # Push Frontend
+        //         docker push ${FRONTEND_IMAGE}:${DOCKER_TAG}
+                
+        //         docker logout
+        //         """
+        //     }
+        // }
+
+        // stage('Update Kubernetes') {
+        //     steps {
+        //         echo 'Applying new K8s Config...'
+
+        //         // 1. Apply Infrastructure (DB + Logging)
+        //         sh "kubectl --kubeconfig=/var/lib/jenkins/kubeconfig apply -f k8s-database.yaml"
+        //         sh "kubectl --kubeconfig=/var/lib/jenkins/kubeconfig apply -f k8s-logging.yaml"
+                
+        //         // 2. Apply Apps
+        //         sh "kubectl --kubeconfig=/var/lib/jenkins/kubeconfig apply -f k8s-backend.yaml"
+        //         sh "kubectl --kubeconfig=/var/lib/jenkins/kubeconfig apply -f k8s-frontend.yaml"
+
+        //         // 3. Restart to pick up new images
+        //         sh "kubectl --kubeconfig=/var/lib/jenkins/kubeconfig rollout restart deployment/backend-deployment"
+        //         sh "kubectl --kubeconfig=/var/lib/jenkins/kubeconfig rollout restart deployment/frontend-deployment"
+        //     }
+        // }
+
+
+        ---
+- name: "Provision server for MLOps deployment"
+  hosts: server
+  gather_facts: yes
+
+  vars_files:
+    - rotpot_vault.yml
+  
+  roles:
+    - update_system
+    - install_docker
+    - install_minikube
+
+    ---
+- name: "MLOps CI/CD Stages on Remote Host"
+  hosts: server
+  gather_facts: no 
+  vars:
+    # Variables passed from the Jenkinsfile environment
+    dockerhub_user: "{{ lookup('env', 'DOCKER_CREDS_USR') }}"
+    dockerhub_pass: "{{ lookup('env', 'DOCKER_CREDS_PSW') }}"
+    k8s_namespace: "rottenpotatoes"
+    kubeconfig_path: "{{ ansible_user_dir }}/.kube/config"
+    backend_image: "{{ lookup('env', 'BACKEND_IMAGE') }}"
+    frontend_image: "{{ lookup('env', 'FRONTEND_IMAGE') }}"
+    docker_tag: "{{ lookup('env', 'DOCKER_TAG') }}"
+  
+  vars_files:
+    - rotpot_vault.yml
+
+  tasks:
+    # Tasks related to directory management
+    - name: Ensure project directory exists
+      ansible.builtin.file:
+        path: /home/{{ ansible_user }}/project_workspace
+        state: directory
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}" 
+        recurse: yes
+      become: yes
+      
+    - name: Copy MLflow history to remote host
+      ansible.builtin.synchronize:
+        src: "/var/lib/jenkins/mlflow_history/"
+        dest: "/home/{{ ansible_user }}/mlflow_history/"
+        mode: push
+        archive: yes
+      args:
+        rsync_opts:
+          - "--chown={{ ansible_user }}:{{ ansible_user }}"
+      become: yes
+
+    - name: Copy Code, Config, and DVC Pointers
+      ansible.builtin.synchronize:
+        src: "{{ workspace }}/"
+        dest: /home/{{ ansible_user }}/project_workspace/
+        mode: push
+        archive: yes
+      args:
+        rsync_opts:
+          - "--exclude=.dvc/cache" 
+          - "--chown={{ ansible_user }}:{{ ansible_user }}"
+      become: yes
+
+    # Kubernetes pre-requisites
+    - name: Get Minikube IP
+      ansible.builtin.command: minikube ip
+      register: minikube_ip_cmd
+      become_user: "{{ ansible_user }}"
+      become: yes
+
+    - name: Add Minikube hostnames to /etc/hosts
+      become: yes
+      ansible.builtin.lineinfile:
+        path: /etc/hosts
+        line: "{{ minikube_ip_cmd.stdout }} rottenpotatoes.com kibana.com"
+        state: present
+
+    - name: Create rottenpotatoes namespace
+      ansible.builtin.shell: |
+        kubectl --kubeconfig={{ kubeconfig_path }} create namespace {{ k8s_namespace }} || true
+      become: yes
+        
+    - name: Create Postgres Kubernetes Secret
+      ansible.builtin.shell: |
+        kubectl --kubeconfig={{ kubeconfig_path }} create secret generic postgres-secret \
+          --from-literal=DB_HOST='{{ db_host }}' \
+          --from-literal=POSTGRES_USER='{{ postgres_user }}' \
+          --from-literal=POSTGRES_PASSWORD='{{ postgres_password }}' \
+          --from-literal=POSTGRES_DB='{{ postgres_db }}' \
+          --dry-run=client -o yaml | kubectl --kubeconfig={{ kubeconfig_path }} apply -f - -n {{ k8s_namespace }}
+      args:
+        chdir: "/home/{{ ansible_user }}/project_workspace/kubernetes"
+      become: yes
+
+    - name: Render backend.yaml with env variables on remote
+      ansible.builtin.shell: |
+        export BACKEND_IMAGE="{{ backend_image }}"
+        export DOCKER_TAG="{{ docker_tag }}"
+        envsubst < templates/backend.yaml.j2 > k8s-backend.yaml
+      args:
+        chdir: /home/{{ ansible_user }}/project_workspace/kubernetes
+      become: yes
+
+
+    - name: Render backend.yaml with env variables on remote
+      ansible.builtin.shell: |
+        export FRONTEND_IMAGE="{{ frontend_image }}"
+        export DOCKER_TAG="{{ docker_tag }}"
+        envsubst < templates/frontend.yaml.j2 > k8s-frontend.yaml
+      args:
+        chdir: /home/{{ ansible_user }}/project_workspace/kubernetes
+      become: yes
+
+    - name: 1. TRAIN MODEL & PREPARE FOR DEPLOYMENT
+      become: yes
+      become_user: "{{ ansible_user }}"
+      ansible.builtin.shell: |
+        echo "=== Starting MLOps Training ==="
+        set -e
+
+        echo "=== Creating new virtualenv ==="
+        python3 -m venv venv
+        . venv/bin/activate
+
+        pip install --upgrade pip
+        pip install -r requirements.txt
+
+        echo "=== DVC pull ==="
+        dvc remote remove mylocal || true
+        dvc remote add -d -f mylocal /tmp/dvc_store
+        dvc pull
+
+        echo "=== Linking MLflow history ==="
+        rm -rf mlruns || true
+        ln -s /home/{{ ansible_user }}/mlflow_history mlruns
+
+        echo "=== Running Training Script ==="
+        python3 train.py
+
+        echo "=== Preparing latest_model directory ==="
+        rm -rf mlruns/latest_model || true
+        rm -rf ml_model || true
+        mkdir ml_model
+
+        echo "=== Locating latest model.pkl ==="
+        LATEST_LINE=$(find /home/{{ ansible_user }}/mlflow_history -name "model.pkl" -type f -printf "%T@ %p\n" | sort -n | tail -1)
+
+        if [ -z "$LATEST_LINE" ]; then
+            echo "ERROR: No model.pkl found. Aborting."
+            exit 1
+        fi
+
+        LATEST_PKL_PATH=$(echo "$LATEST_LINE" | cut -d' ' -f2-)
+        echo "Found latest model at: $LATEST_PKL_PATH"
+
+        ARTIFACT_DIR=$(dirname "$LATEST_PKL_PATH")
+        echo "Copying from artifact dir: $ARTIFACT_DIR"
+
+        cp -rv "$ARTIFACT_DIR"/* ml_model/
+      args:
+        chdir: /home/{{ ansible_user }}/project_workspace
+
+    - name: 2. BUILD DOCKER IMAGES
+      ansible.builtin.shell: |
+        set -e
+        cd /home/{{ ansible_user }}/project_workspace
+        docker build -f docker/Dockerfile.backend -t {{ backend_image }}:{{ docker_tag }} .
+        docker build -f docker/Dockerfile.frontend -t {{ frontend_image }}:{{ docker_tag }} .
+      become_user: "{{ ansible_user }}"
+      become: yes
+
+    - name: 3. PUSH TO DOCKER HUB
+      ansible.builtin.shell: |
+        set -e
+        cd /home/{{ ansible_user }}/project_workspace
+        echo "{{ dockerhub_pass }}" | docker login -u "{{ dockerhub_user }}" --password-stdin
+        docker push {{ backend_image }}:{{ docker_tag }}
+        docker push {{ frontend_image }}:{{ docker_tag }}
+        docker logout
+      become: yes
+
+    - name: 4. UPDATE KUBERNETES DEPLOYMENT
+      ansible.builtin.shell: |
+        set -e
+        cd /home/{{ ansible_user }}/project_workspace/kubernetes
+
+        kubectl --kubeconfig={{ kubeconfig_path }} apply -f k8s-logging.yaml -n {{ k8s_namespace }}
+        kubectl --kubeconfig={{ kubeconfig_path }} apply -f k8s-database.yaml -n {{ k8s_namespace }}
+
+        kubectl --kubeconfig={{ kubeconfig_path }} apply -f k8s-backend.yaml -n {{ k8s_namespace }}
+        kubectl --kubeconfig={{ kubeconfig_path }} apply -f k8s-frontend.yaml -n {{ k8s_namespace }}
+
+        kubectl --kubeconfig={{ kubeconfig_path }} apply -f k8s-ingress.yaml -n {{ k8s_namespace }}
+
+        kubectl --kubeconfig={{ kubeconfig_path }} rollout restart deployment/backend-deployment -n {{ k8s_namespace }}
+        kubectl --kubeconfig={{ kubeconfig_path }} rollout restart deployment/frontend-deployment -n {{ k8s_namespace }}
+        kubectl --kubeconfig={{ kubeconfig_path }} rollout restart deployment/elasticsearch -n {{ k8s_namespace }}
+        kubectl --kubeconfig={{ kubeconfig_path }} rollout restart deployment/kibana -n {{ k8s_namespace }}
+
+      become: yes
+
+    - name: 5. DEPLOY LOGGING INFRASTRUCTURE
+      ansible.builtin.shell: |
+        kubectl --kubeconfig={{ kubeconfig_path }} rollout status deployment/kibana --timeout=300s -n {{ k8s_namespace }}
+      args:
+        chdir: /home/{{ ansible_user }}/project_workspace
+      become: yes
+
+    - name: 6. CONFIGURE KIBANA 
+      ansible.builtin.uri:
+        url: "http://kibana.com/api/saved_objects/index-pattern/rotten_potatoes_pattern"
+        method: POST
+        headers:
+          kbn-xsrf: "true" # Required by Kibana to prove this isn't a hacker attack
+          Content-Type: "application/json"
+        body_format: json
+        body:
+          attributes:
+            title: "rotten_potatoes_logs*"
+            timeFieldName: "timestamp"
+        status_code: [200, 409] 
+      register: kibana_response
+      retries: 10     
+      delay: 10        
+      until: kibana_response.status == 200 or kibana_response.status == 409
+      become: yes
+
+      

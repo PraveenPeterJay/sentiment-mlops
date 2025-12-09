@@ -1,3 +1,4 @@
+---
 - name: Get Minikube IP
   ansible.builtin.command: minikube ip
   register: minikube_ip_cmd

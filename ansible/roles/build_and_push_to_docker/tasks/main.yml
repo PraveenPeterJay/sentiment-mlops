@@ -1,3 +1,4 @@
+---
 - name: Build Docker Images
   ansible.builtin.shell: |
     set -e

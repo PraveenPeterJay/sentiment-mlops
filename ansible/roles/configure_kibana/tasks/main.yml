@@ -1,3 +1,4 @@
+---
 - name: Configure Kibana
   ansible.builtin.uri:
     url: "http://kibana.com/api/saved_objects/index-pattern/rotten_potatoes_pattern"
