@@ -97,7 +97,7 @@
 
     - name: Render backend.yaml with env variables on remote
       ansible.builtin.shell: |
-        export BACKEND_IMAGE="{{ backend_image }}"
+        export FRONTEND_IMAGE="{{ backend_image }}"
         export DOCKER_TAG="{{ docker_tag }}"
         envsubst < templates/frontend.yaml.j2 > k8s-frontend.yaml
       args:
