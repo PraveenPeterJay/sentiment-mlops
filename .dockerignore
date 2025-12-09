@@ -1,7 +1,7 @@
 # 1. MLflow and Machine Learning Artifacts (Critical for Size Reduction)
 .dvc/
 *.dvc
-data/
+mlruns/
 
 # 2. Python Environment and Cache
 venv/
@@ -15,3 +15,5 @@ __pycache__/
 .gitignore
 *.log
 *.pdf
+*.zip
+*.csv

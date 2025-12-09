@@ -127,7 +127,8 @@
 
         echo "=== Preparing latest_model directory ==="
         rm -rf mlruns/latest_model || true
-        mkdir -p mlruns/latest_model
+        rm -rf ml_model || true
+        mkdir ml_model
 
         echo "=== Locating latest model.pkl ==="
         LATEST_LINE=$(find /home/{{ ansible_user }}/mlflow_history -name "model.pkl" -type f -printf "%T@ %p\n" | sort -n | tail -1)
@@ -143,7 +144,7 @@
         ARTIFACT_DIR=$(dirname "$LATEST_PKL_PATH")
         echo "Copying from artifact dir: $ARTIFACT_DIR"
 
-        cp -rv "$ARTIFACT_DIR"/* mlruns/latest_model/
+        cp -rv "$ARTIFACT_DIR"/* ml_model/
       args:
         chdir: /home/{{ ansible_user }}/project_workspace
 

@@ -120,7 +120,7 @@ model = None
 latest_run_id = "Unknown"
 
 try:
-    search_path = "mlruns"
+    search_path = "ml_model"
     model_uri = None
     for root, dirs, files in os.walk(search_path):
         if "model.pkl" in files:
