@@ -57,9 +57,10 @@
   when: "'Running Running Running' not in minikube_status.stdout"
 
 - name: Enable Minikube ingress addon
+  become: yes
+  become_user: "{{ minikube_user }}"
   ansible.builtin.command: >
     minikube addons enable ingress
-  become: yes
 
 - name: Display Minikube final status
   become: yes
