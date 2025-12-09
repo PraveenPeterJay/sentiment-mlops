@@ -11,7 +11,7 @@
     dockerhub_user: "{{ lookup('env', 'DOCKER_CREDS_USR') }}"
     dockerhub_pass: "{{ lookup('env', 'DOCKER_CREDS_PSW') }}"
     k8s_namespace: "rottenpotatoes"
-    kubeconfig_path: "{{ ansible_user_dir }}/.kube/config"
+    kubeconfig_path: "/home/{{ ansible_user }}/.kube/config"
     backend_image: "{{ lookup('env', 'BACKEND_IMAGE') }}"
     frontend_image: "{{ lookup('env', 'FRONTEND_IMAGE') }}"
     docker_tag: "{{ lookup('env', 'DOCKER_TAG') }}"
