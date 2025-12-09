@@ -87,12 +87,12 @@
 
     - name: Render backend.yaml with env variables
       ansible.builtin.shell: |
-        envsubst < kubernetes/backend.yaml.j2 > /home/{{ ansible_user }}/project_workspace/kubernetes/k8s-backend.yaml
+        envsubst < kubernetes/templates/backend.yaml.j2 > /home/{{ ansible_user }}/project_workspace/kubernetes/k8s-backend.yaml
       become: yes
 
     - name: Render frontend.yaml
       ansible.builtin.shell: |
-        envsubst < kubernetes/frontend.yaml.j2 > /home/{{ ansible_user }}/project_workspace/kubernetes/k8s-frontend.yaml
+        envsubst < kubernetes/templates/frontend.yaml.j2 > /home/{{ ansible_user }}/project_workspace/kubernetes/k8s-frontend.yaml
       become: yes
 
     # Main sequence of tasks
