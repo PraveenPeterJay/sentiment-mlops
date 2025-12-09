@@ -71,6 +71,7 @@
     - name: Create rottenpotatoes namespace
       ansible.builtin.shell: |
         kubectl --kubeconfig={{ kubeconfig_path }} create namespace {{ k8s_namespace }}
+      become_user: yes
         
     - name: Create Postgres Kubernetes Secret
       ansible.builtin.shell: |
@@ -82,13 +83,13 @@
           --dry-run=client -o yaml | kubectl --kubeconfig={{ kubeconfig_path }} apply -f - -n {{ k8s_namespace }}
       args:
         chdir: "/home/{{ ansible_user }}/project_workspace/kubernetes"
-      become: yes
+      become_user: yes
 
     - name: Render backend.yaml
       ansible.builtin.template:
         src: kubernetes/backend.yaml.j2
         dest: /home/{{ ansible_user }}/project_workspace/kubernetes/k8s-backend.yaml
-      become: yes
+      become_user: yes
 
     - name: Render frontend.yaml
       ansible.builtin.template:
