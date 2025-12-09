@@ -151,10 +151,8 @@
       ansible.builtin.shell: |
         set -e
         cd /home/{{ ansible_user }}/project_workspace
-        docker build -f Dockerfile.backend -t {{ backend_image }}:{{ docker_tag }} .
-        docker build -f Dockerfile.frontend -t {{ frontend_image }}:{{ docker_tag }} .
-      args:
-        chdir: /home/{{ ansible_user }}/project_workspace/docker
+        docker build -f docker/Dockerfile.backend -t {{ backend_image }}:{{ docker_tag }} .
+        docker build -f docker/Dockerfile.frontend -t {{ frontend_image }}:{{ docker_tag }} .
       become: yes
 
     - name: 3. PUSH TO DOCKER HUB
