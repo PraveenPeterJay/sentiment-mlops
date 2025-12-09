@@ -85,20 +85,25 @@
         chdir: "/home/{{ ansible_user }}/project_workspace/kubernetes"
       become: yes
 
-    - name: Render backend.yaml using Ansible template module
-      ansible.builtin.template:
-        src: templates/backend.yaml.j2
-        dest: k8s-backend.yaml
+    - name: Render backend.yaml with env variables on remote
+      ansible.builtin.shell: |
+        export BACKEND_IMAGE="{{ backend_image }}"
+        export DOCKER_TAG="{{ docker_tag }}"
+        envsubst < templates/backend.yaml.j2 > k8s-backend.yaml
       args:
-        chdir: "/home/{{ ansible_user }}/project_workspace/kubernetes"
+        chdir: /home/{{ ansible_user }}/project_workspace/kubernetes
       become: yes
 
-    - name: Render frontend.yaml
+
+    - name: Render backend.yaml with env variables on remote
       ansible.builtin.shell: |
+        export BACKEND_IMAGE="{{ backend_image }}"
+        export DOCKER_TAG="{{ docker_tag }}"
         envsubst < templates/frontend.yaml.j2 > k8s-frontend.yaml
       args:
-        chdir: "/home/{{ ansible_user }}/project_workspace/kubernetes"
+        chdir: /home/{{ ansible_user }}/project_workspace/kubernetes
       become: yes
+
 
     # Main sequence of tasks
     - name: 1. TRAIN MODEL 
