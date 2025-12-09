@@ -106,59 +106,56 @@
       become: yes
 
     - name: 1. TRAIN MODEL & PREPARE FOR DEPLOYMENT
+      become: yes
+      become_user: "{{ ansible_user }}"
+
       ansible.builtin.shell: |
-        echo "Starting MLOps training steps..."
+        echo "=== Starting MLOps Training ==="
         set -e
         cd /home/{{ ansible_user }}/project_workspace
-        
-        # --- VENV SETUP FIX: FORCE OWNERSHIP & DELETE ---
-        # 1. Take recursive ownership of the venv directory (using elevated privileges)
-        chown -R {{ ansible_user }}:{{ ansible_user }} venv || true
-        
-        # 2. Delete the directory (Now that {{ ansible_user }} owns it, this should work)
-        rm -rf venv || true
-        
-        # 3. Setup Venv
+
+        echo "=== Creating new virtualenv ==="
         python3 -m venv venv
         . venv/bin/activate
+
         pip install --upgrade pip
         pip install -r requirements.txt
 
-        # DVC: Uses the shared, permanent archive
+        echo "=== DVC pull ==="
         dvc remote remove mylocal || true
         dvc remote add -d -f mylocal /tmp/dvc_store
         dvc pull
-        
-        # Handle MLflow history link (Ensure path is consistent)
-        ln -sf /home/{{ ansible_user }}/mlflow_history mlruns
-        
-        # Run Training Script (creates a new run/model in the linked mlruns)
+
+        echo "=== Linking MLflow history ==="
+        rm -rf mlruns || true
+        ln -s /home/{{ ansible_user }}/mlflow_history mlruns
+
+        echo "=== Running Training Script ==="
         python3 train.py
-        
-        # --- MODEL DISCOVERY AND PREPARATION ---
-        # ... (rest of the discovery/copy logic, which is now downstream)
-        unlink mlruns
+
+        echo "=== Preparing latest_model directory ==="
         rm -rf mlruns/latest_model || true
         mkdir -p mlruns/latest_model
 
-        # 2. Find the LATEST 'model.pkl' path based on modification time
+        echo "=== Locating latest model.pkl ==="
         LATEST_LINE=$(find /home/{{ ansible_user }}/mlflow_history -name "model.pkl" -type f -printf "%T@ %p\n" | sort -n | tail -1)
-        # ... (rest of the robust search and copy) ...
+
         if [ -z "$LATEST_LINE" ]; then
-            echo "ERROR: No new model.pkl found in MLflow history. Stopping deployment."
+            echo "ERROR: No model.pkl found. Aborting."
             exit 1
         fi
-        
-        LATEST_PKL_PATH=$(echo "$LATEST_LINE" | sed 's/[^ ]* //')
+
+        LATEST_PKL_PATH=$(echo "$LATEST_LINE" | cut -d' ' -f2-)
         echo "Found latest model at: $LATEST_PKL_PATH"
-        
+
         ARTIFACT_DIR=$(dirname "$LATEST_PKL_PATH")
+        echo "Copying from artifact dir: $ARTIFACT_DIR"
+
         cp -rv "$ARTIFACT_DIR"/* mlruns/latest_model/
 
       args:
         chdir: /home/{{ ansible_user }}/project_workspace
-      become_user: "{{ ansible_user }}"
-      become: yes
+
 
     - name: 2. BUILD DOCKER IMAGES
       ansible.builtin.shell: |
