@@ -62,16 +62,11 @@
         path: /etc/hosts
         line: "{{ minikube_ip_cmd.stdout }} rottenpotatoes.com kibana.com"
         state: present
-    
+
     - name: Create rottenpotatoes namespace
-      kubernetes.core.k8s:
-        kubeconfig: "{{ kubeconfig_path }}"
-        api_version: v1
-        kind: Namespace
-        name: "{{ k8s_namespace }}"
-        state: present
-      delegate_to: "{{ inventory_hostname }}"
-    
+      ansible.builtin.shell: |
+        kubectl --kubeconfig={{ kubeconfig_path }} create namespace {{ k8s_namespace }}
+        
     - name: Create Postgres Kubernetes Secret
       ansible.builtin.shell: |
         kubectl --kubeconfig={{ kubeconfig_path }} create secret generic postgres-secret \
