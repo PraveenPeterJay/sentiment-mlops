@@ -59,6 +59,7 @@
       ansible.builtin.command: minikube ip
       register: minikube_ip_cmd
       become_user: "{{ ansible_user }}"
+      become: yes
 
     - name: Add Minikube hostnames to /etc/hosts
       become: yes
@@ -66,7 +67,6 @@
         path: /etc/hosts
         line: "{{ minikube_ip_cmd.stdout }} rottenpotatoes.com kibana.com"
         state: present
-      become_user: "{{ ansible_user }}"
       become: yes
 
     - name: Create rottenpotatoes namespace
