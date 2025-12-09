@@ -181,6 +181,9 @@
 
         kubectl --kubeconfig={{ kubeconfig_path }} rollout restart deployment/backend-deployment -n {{ k8s_namespace }}
         kubectl --kubeconfig={{ kubeconfig_path }} rollout restart deployment/frontend-deployment -n {{ k8s_namespace }}
+        kubectl --kubeconfig={{ kubeconfig_path }} rollout restart deployment/elasticsearch -n {{ k8s_namespace }}
+        kubectl --kubeconfig={{ kubeconfig_path }} rollout restart deployment/kibana -n {{ k8s_namespace }}
+
       become: yes
 
     - name: 5. DEPLOY LOGGING INFRASTRUCTURE
