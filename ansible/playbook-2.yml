@@ -21,8 +21,8 @@
       ansible.builtin.file:
         path: /home/{{ ansible_user }}/project_workspace
         state: directory
-        owner: iiitb
-        group: iiitb
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}" 
         recurse: yes
       become: yes
       
@@ -32,6 +32,9 @@
         dest: "/home/{{ ansible_user }}/mlflow_history/"
         mode: push
         archive: yes
+      args:
+        rsync_opts:
+          - "--chown={{ ansible_user }}:{{ ansible_user }}"
       become: yes
 
     - name: Copy Code, Config, and DVC Pointers
@@ -43,6 +46,7 @@
       args:
         rsync_opts:
           - "--exclude=.dvc/cache" 
+          - "--chown={{ ansible_user }}:{{ ansible_user }}"
       become: yes
 
     # Kubernetes pre-requisites
