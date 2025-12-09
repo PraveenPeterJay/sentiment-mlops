@@ -13,7 +13,7 @@
     docker_tag: "{{ lookup('env', 'DOCKER_TAG') }}"
   
   vars_files:
-    - sudo_pwd_vault.yml
+    - rotpot_vault.yml
 
   tasks:
     # Tasks related to directory management
