@@ -24,6 +24,7 @@
         owner: "{{ ansible_user }}"
         group: "{{ ansible_user }}" 
         recurse: yes
+      become_user: "{{ ansible_user }}"
       become: yes
 
     - name: Ensure MLflow history directory exists and is owned by user
@@ -67,7 +68,6 @@
         path: /etc/hosts
         line: "{{ minikube_ip_cmd.stdout }} rottenpotatoes.com kibana.com"
         state: present
-      become: yes
 
     - name: Create rottenpotatoes namespace
       ansible.builtin.shell: |
