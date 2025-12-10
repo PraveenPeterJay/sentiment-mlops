@@ -62,6 +62,12 @@
   ansible.builtin.command: >
     minikube addons enable ingress
 
+- name: Enable Minikube metrics-server addon
+  become: yes
+  become_user: "{{ minikube_user }}"
+  ansible.builtin.command: >
+    minikube addons enable metrics-server
+
 - name: Display Minikube final status
   become: yes
   become_user: "{{ minikube_user }}"
