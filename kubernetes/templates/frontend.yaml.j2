@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: frontend
-        image: ${FRONTEND_IMAGE}:${DOCKER_TAG}
+        image: {{ frontend_image }}:{{ docker_tag }}
         imagePullPolicy: Always
         ports:
         - containerPort: 8501

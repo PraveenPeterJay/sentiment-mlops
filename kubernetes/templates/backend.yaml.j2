@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: backend
-        image: ${BACKEND_IMAGE}:${DOCKER_TAG}
+        image: {{ backend_image }}:{{ docker_tag }}
         imagePullPolicy: Always
         ports:
         - containerPort: 8000
