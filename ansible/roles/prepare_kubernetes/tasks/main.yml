@@ -52,14 +52,18 @@
 
 - name: Render backend.yaml with env variables on remote
   template:
-    src: /home/{{ ansible_user }}/project_workspace/kubernetes/templates/backend.yaml.j2
-    dest: /home/{{ ansible_user }}/project_workspace/kubernetes/backend.yaml
+    src: templates/backend.yaml.j2
+    dest: backend.yaml
+  args:
+     chdir: /home/{{ ansible_user }}/project_workspace/kubernetes
   become_user: "{{ ansible_user }}" 
   become: yes
 
 - name: Render frontend.yaml with env variables on remote
   template:
-    src: /home/{{ ansible_user }}/project_workspace/kubernetes/templates/frontend.yaml.j2
-    dest: /home/{{ ansible_user }}/project_workspace/kubernetes/frontend.yaml
+    src: templates/frontend.yaml.j2
+    dest: frontend.yaml
+  args:
+     chdir: /home/{{ ansible_user }}/project_workspace/kubernetes
   become_user: "{{ ansible_user }}" 
   become: yes
