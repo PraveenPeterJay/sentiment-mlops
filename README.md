@@ -63,6 +63,5 @@ Kindly refer ```report.pdf``` for all details.
 ├── problem_statement.pdf
 ├── report.pdf
 ├── requirements.txt
-├── rough.txt
 └── train.py
 ```
