@@ -31,39 +31,20 @@
   become_user: "{{ ansible_user }}"  
   become: yes
 
-# - name: Render backend.yaml with env variables on remote
-#   ansible.builtin.shell: |
-#     export BACKEND_IMAGE="{{ backend_image }}"
-#     export DOCKER_TAG="{{ docker_tag }}"
-#     envsubst < templates/backend.yaml.j2 > k8s-backend.yaml
-#   args:
-#     chdir: /home/{{ ansible_user }}/project_workspace/kubernetes
-#   become: yes
-
-
-# - name: Render backend.yaml with env variables on remote
-#   ansible.builtin.shell: |
-#     export FRONTEND_IMAGE="{{ frontend_image }}"
-#     export DOCKER_TAG="{{ docker_tag }}"
-#     envsubst < templates/frontend.yaml.j2 > k8s-frontend.yaml
-#   args:
-#     chdir: /home/{{ ansible_user }}/project_workspace/kubernetes
-#   become: yes
-
 - name: Render backend.yaml with env variables on remote
-  template:
-    src: templates/backend.yaml.j2
-    dest: backend.yaml
+  ansible.builtin.shell: |
+    export BACKEND_IMAGE="{{ backend_image }}"
+    export DOCKER_TAG="{{ docker_tag }}"
+    envsubst < templates/backend.yaml.j2 > k8s-backend.yaml
   args:
-     chdir: /home/{{ ansible_user }}/project_workspace/kubernetes
-  become_user: "{{ ansible_user }}" 
+    chdir: /home/{{ ansible_user }}/project_workspace/kubernetes
   become: yes
 
-- name: Render frontend.yaml with env variables on remote
-  template:
-    src: templates/frontend.yaml.j2
-    dest: frontend.yaml
+- name: Render backend.yaml with env variables on remote
+  ansible.builtin.shell: |
+    export FRONTEND_IMAGE="{{ frontend_image }}"
+    export DOCKER_TAG="{{ docker_tag }}"
+    envsubst < templates/frontend.yaml.j2 > k8s-frontend.yaml
   args:
-     chdir: /home/{{ ansible_user }}/project_workspace/kubernetes
-  become_user: "{{ ansible_user }}" 
+    chdir: /home/{{ ansible_user }}/project_workspace/kubernetes
   become: yes
