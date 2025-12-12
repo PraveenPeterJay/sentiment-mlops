@@ -5,7 +5,7 @@ import os
 
 # --- CONFIGURATION ---
 st.set_page_config(page_title="Rotten Potatoes", page_icon="🥔")
-st.title("🥔 Rotten Potatoes: IIITB's Most Trusted Movie Review Hub")
+st.title("🥔 Rotten Potatoes: IIITB's Least Trusted Movie Review Hub")
 
 # --- API ENDPOINTS ---
 # Using the same logic for API URL as before, but the base URL.
