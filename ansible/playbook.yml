@@ -21,7 +21,7 @@
     - install_docker
     - install_kubernetes
     - set_up_workspace
-    # - train_model
+    - train_model
     - use_latest_model
     - build_and_push_to_docker
     - prepare_kubernetes
